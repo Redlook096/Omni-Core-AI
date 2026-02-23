@@ -113,6 +113,8 @@ export function AIInput({
   const [inputValue, setInputValue] = useState("");
   const [cursorPosition, setCursorPosition] = useState({ top: 0, left: 0, height: 24 });
   const [isFocused, setIsFocused] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const updateCursorPosition = () => {
     if (textareaRef.current) {
@@ -120,13 +122,33 @@ export function AIInput({
       const coords = getCaretCoordinates(textareaRef.current, selectionStart);
       // Adjust for scroll position
       const scrollTop = textareaRef.current.scrollTop;
+      const cursorHeight = coords.height * 0.9; // Standard height (90% of line height)
+      const heightOffset = (coords.height - cursorHeight) / 2; // Center vertically
+
       setCursorPosition({
-        top: coords.top - scrollTop,
-        left: coords.left,
-        height: coords.height
+        top: coords.top - scrollTop + heightOffset,
+        left: coords.left + 2, // Slight offset to ensure it's always in front
+        height: cursorHeight
       });
+
+      // Handle typing state
+      setIsTyping(true);
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      typingTimeoutRef.current = setTimeout(() => {
+        setIsTyping(false);
+      }, 500);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     updateCursorPosition();
@@ -195,7 +217,7 @@ export function AIInput({
               "overflow-y-auto resize-none",
               "focus-visible:ring-0 focus-visible:ring-offset-0",
               "transition-all duration-200 ease-out", 
-              "leading-relaxed py-4", 
+              "leading-relaxed py-[10px]", 
               "text-lg",
               `min-h-[${minHeight}px]`,
               `max-h-[${maxHeight}px]`,
@@ -226,7 +248,7 @@ export function AIInput({
 
           {/* Custom Smooth Cursor */}
           <motion.div
-            className="absolute bg-black dark:bg-white w-[2px] pointer-events-none"
+            className="absolute pointer-events-none"
             animate={{
               top: cursorPosition.top,
               left: cursorPosition.left,
@@ -235,19 +257,32 @@ export function AIInput({
             }}
             transition={{
               type: "spring",
-              stiffness: 500,
-              damping: 28,
+              stiffness: 700, // Faster to keep up with typing
+              damping: 30,    // Still bouncy but controlled
               mass: 0.5
             }}
             style={{
-              position: 'absolute',
-              zIndex: 50
+              zIndex: 50,
+              width: "2px"
             }}
-          />
+          >
+            <motion.div 
+              animate={{ opacity: isTyping ? 1 : [1, 1, 0, 0] }}
+              transition={{ 
+                duration: 1.1, 
+                repeat: Infinity, 
+                ease: "linear",
+                times: [0, 0.5, 0.5, 1] 
+              }}
+              className="w-full h-full bg-black dark:bg-white rounded-full"
+            />
+          </motion.div>
+
+          {/* ... (Mic and Send button remain same) */}
 
           <div
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 rounded-xl bg-black/5 dark:bg-white/5 py-2 px-2 transition-all duration-200 ease-out",
+              "absolute top-1/2 -translate-y-1/2 rounded-xl py-2 px-2 transition-all duration-200 ease-out",
               inputValue ? "right-16" : "right-6"
             )}
           >

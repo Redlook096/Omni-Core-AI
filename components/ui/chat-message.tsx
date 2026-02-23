@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '../../lib/utils';
 import { 
   Copy, 
@@ -16,56 +16,66 @@ export interface ChatMessageProps {
   content: string;
   onRegenerate?: () => void;
   isStreaming?: boolean;
+  typingSpeed?: 'slow' | 'normal' | 'fast';
 }
 
-const useTypewriter = (text: string, speed: number = 50, isEnabled: boolean = false) => {
+const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' | 'normal' | 'fast' = 'normal') => {
   const [displayedText, setDisplayedText] = useState('');
+  const index = useRef(0);
 
   useEffect(() => {
     if (!isEnabled) {
       setDisplayedText(text);
+      index.current = text.length;
       return;
     }
 
-    if (displayedText.length >= text.length) {
-      return;
+    // If text was reset (e.g. new message), reset index
+    if (text.length < index.current) {
+        index.current = 0;
+        setDisplayedText('');
+    }
+    
+    // If already caught up, do nothing
+    if (index.current >= text.length) {
+        return;
     }
 
-    const timeoutId = setTimeout(() => {
-      const currentLength = displayedText.length;
-      // Find the next space or punctuation to define a "word" chunk
-      // We look ahead from the current position
-      const remaining = text.slice(currentLength);
-      const nextSpace = remaining.indexOf(' ');
-      
-      let nextChunkLength = 1;
-      if (nextSpace !== -1) {
-        nextChunkLength = nextSpace + 1; // Include the space
-      } else {
-        nextChunkLength = remaining.length; // Rest of the string
+    let animationId: number;
+
+    const animate = () => {
+      if (index.current < text.length) {
+        // Calculate how many characters to add based on "distance" to target
+        const distance = text.length - index.current;
+        
+        let divisor = 10;
+        if (speed === 'slow') divisor = 20;
+        if (speed === 'fast') divisor = 5;
+
+        // Add at least 1 char, but speed up if falling behind
+        const step = Math.max(1, Math.ceil(distance / divisor)); 
+        
+        index.current = Math.min(index.current + step, text.length);
+        setDisplayedText(text.slice(0, index.current));
+        animationId = requestAnimationFrame(animate);
       }
+    };
 
-      setDisplayedText(text.slice(0, currentLength + nextChunkLength));
-    }, speed);
-
-    return () => clearTimeout(timeoutId);
-  }, [text, displayedText, speed, isEnabled]);
+    animationId = requestAnimationFrame(animate);
+    return () => cancelAnimationFrame(animationId);
+  }, [text, isEnabled, speed]);
 
   return isEnabled ? displayedText : text;
 };
 
-const FormatText = ({ text, isStreaming }: { text: string, isStreaming?: boolean }) => {
+const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreaming?: boolean }) => {
   if (!text) return null;
 
   // Split by headers ***
   const parts = text.split(/(\*\*\*.*?\*\*\*)/g);
 
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-    >
+    <div>
       {parts.map((part, i) => {
         if (part.startsWith('***') && part.endsWith('***')) {
           return (
@@ -123,18 +133,18 @@ const FormatText = ({ text, isStreaming }: { text: string, isStreaming?: boolean
           className="inline-block w-2 h-5 bg-white ml-1 align-middle"
         />
       )}
-    </motion.div>
+    </div>
   );
-};
+});
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, typingSpeed = 'normal' }) => {
   const isUser = role === 'user';
   const [isCopying, setIsCopying] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Use typewriter effect only for model messages that are streaming
-  const displayedContent = useTypewriter(content, 50, isStreaming && !isUser);
+  const displayedContent = useTypewriter(content, isStreaming && !isUser, typingSpeed);
 
   const handleCopy = async () => {
     setIsCopying(true);
@@ -159,41 +169,62 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
 
   return (
     <motion.div 
-      layout
-      initial={{ opacity: 0, y: 15, scale: 0.98 }}
+      layout={!isStreaming}
+      initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
-      transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }} // Cubic bezier
+      transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className={cn(
-        "flex w-full mb-6",
+        "flex w-full mb-8 relative group",
         isUser ? "justify-end" : "justify-start"
       )}
     >
+      {/* Thread Line for AI messages */}
+      {!isUser && (
+        <div className="absolute left-[-20px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 hidden md:block" />
+      )}
+
       <div className={cn(
-        "flex flex-col gap-1 min-w-0",
-        isUser ? "items-end" : "items-start",
-        "max-w-full"
+        "flex flex-col gap-1 min-w-0 max-w-full",
+        isUser ? "items-end" : "items-start w-full"
       )}>
-        {showLoader ? (
-          <div className="flex items-center gap-3 py-4 px-2">
-             <MorphingSquare className="w-3 h-3 md:w-4 md:h-4" />
-             <span className="text-sm text-neutral-500 animate-pulse">Thinking...</span>
-          </div>
-        ) : (
-          <div
-            className={cn(
-              "text-[15px] leading-7 md:text-[16px] relative",
-              isUser 
-                ? "bg-[#27272a] text-white px-5 py-2.5 rounded-3xl shadow-sm max-w-[85vw] md:max-w-[600px]" 
-                : "text-neutral-200 px-0 py-0 w-full"
-            )}
-          >
-            {isUser ? content : <FormatText text={displayedContent} isStreaming={isStreaming} />}
-          </div>
-        )}
+        <AnimatePresence mode="wait">
+          {showLoader ? (
+            <motion.div 
+              key="loader"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.2 }}
+              className="flex items-center gap-3 py-4 px-2"
+            >
+               <MorphingSquare className="w-3 h-3 md:w-4 md:h-4" />
+               <span className="text-sm text-neutral-500 animate-pulse">Thinking...</span>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="content"
+              initial={{ opacity: 0, scale: 0.98, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ 
+                type: "spring",
+                stiffness: 500,
+                damping: 30
+              }}
+              className={cn(
+                "text-[15px] leading-7 md:text-[16px] relative transition-all duration-300",
+                isUser 
+                  ? "bg-[#27272a] text-white px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85vw] md:max-w-[600px]" 
+                  : "text-neutral-200 px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
+              )}
+            >
+              {isUser ? content : <FormatText text={displayedContent} isStreaming={isStreaming} />}
+            </motion.div>
+          )}
+        </AnimatePresence>
         
         {!isUser && !showLoader && content && (
-          <div className="flex items-center gap-3 mt-1 px-1">
+          <div className="flex items-center gap-2 mt-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             {/* Copy Button with Ring Spinner */}
             <motion.button 
               onClick={handleCopy}

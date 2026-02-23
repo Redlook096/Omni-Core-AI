@@ -18,13 +18,6 @@ const data = [
     href: '#',
   },
   {
-    title: 'Viral Clipper',
-    icon: (
-      <Video className='h-full w-full text-neutral-600 dark:text-neutral-300' />
-    ),
-    href: '#',
-  },
-  {
     title: 'Settings',
     icon: (
       <Settings className='h-full w-full text-neutral-600 dark:text-neutral-300' />
@@ -36,10 +29,10 @@ const data = [
 interface AppleStyleDockProps {
   show?: boolean;
   onHomeClick?: () => void;
-  onVibeCoderClick?: () => void;
+  onSettingsClick?: () => void;
 }
 
-export function AppleStyleDock({ show = true, onHomeClick, onVibeCoderClick }: AppleStyleDockProps) {
+export function AppleStyleDock({ show = true, onHomeClick, onSettingsClick }: AppleStyleDockProps) {
   return (
     <AnimatePresence>
       <motion.div 
@@ -68,7 +61,7 @@ export function AppleStyleDock({ show = true, onHomeClick, onVibeCoderClick }: A
               className='aspect-square rounded-full bg-neutral-200/50 dark:bg-neutral-800/50 border border-white/20 dark:border-white/10 shadow-sm backdrop-blur-sm cursor-pointer'
               onClick={() => {
                 if (item.title === 'Home') onHomeClick?.();
-                if (item.title === 'Vibe Coder') onVibeCoderClick?.();
+                if (item.title === 'Settings') onSettingsClick?.();
               }}
             >
               <DockLabel>{item.title}</DockLabel>
