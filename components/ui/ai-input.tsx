@@ -1,15 +1,13 @@
 import { CornerRightUp, Mic } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "../../lib/utils";
 import { Textarea } from "./textarea";
 import { useAutoResizeTextarea } from "../hooks/use-auto-resize-textarea";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 
 // Simple caret coordinate calculation helper
 const getCaretCoordinates = (element: HTMLTextAreaElement, position: number) => {
   const {
-    top,
-    left,
     width,
     height,
     fontFamily,
@@ -21,8 +19,6 @@ const getCaretCoordinates = (element: HTMLTextAreaElement, position: number) => 
     textTransform,
     wordSpacing,
     textIndent,
-    whiteSpace,
-    wordWrap,
     paddingLeft,
     paddingRight,
     paddingTop,
@@ -73,9 +69,6 @@ const getCaretCoordinates = (element: HTMLTextAreaElement, position: number) => 
   span.textContent = element.value.substring(position) || '.';
   div.appendChild(span);
 
-  const spanRect = span.getBoundingClientRect();
-  const divRect = div.getBoundingClientRect();
-
   const coordinates = {
     top: span.offsetTop + parseInt(borderTopWidth),
     left: span.offsetLeft + parseInt(borderLeftWidth),
@@ -116,7 +109,7 @@ export function AIInput({
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const updateCursorPosition = () => {
+  const updateCursorPosition = useCallback(() => {
     if (textareaRef.current) {
       const { selectionStart } = textareaRef.current;
       const coords = getCaretCoordinates(textareaRef.current, selectionStart);
@@ -140,7 +133,7 @@ export function AIInput({
         setIsTyping(false);
       }, 500);
     }
-  };
+  }, [textareaRef]);
 
   useEffect(() => {
     return () => {
@@ -152,7 +145,7 @@ export function AIInput({
 
   useEffect(() => {
     updateCursorPosition();
-  }, [inputValue]);
+  }, [inputValue, updateCursorPosition]);
 
   const handleReset = () => {
     if (!inputValue.trim()) return;
@@ -164,7 +157,7 @@ export function AIInput({
   };
 
   return (
-    <div className={cn("w-full py-4", className)}>
+    <div className="w-full py-4">
       <motion.div
         layout
         initial={{
@@ -198,7 +191,8 @@ export function AIInput({
         }}
         style={{ minHeight: minHeight }}
         className={cn(
-          "relative mx-auto bg-black/5 dark:bg-zinc-900/80 backdrop-blur-md overflow-hidden border border-white/5 shadow-xl",
+          "relative mx-auto bg-[var(--bg-input)] backdrop-blur-md overflow-hidden border border-[var(--border-color)] shadow-xl",
+          className
         )}
       >
         <motion.div
@@ -211,9 +205,9 @@ export function AIInput({
             placeholder={placeholder}
             className={cn(
               "w-full max-w-3xl bg-transparent pl-8 pr-24 relative z-10",
-              "placeholder:text-black/50 dark:placeholder:text-zinc-500",
+              "placeholder:text-[var(--text-muted)]",
               "border-none ring-0 focus:ring-0",
-              "text-black dark:text-zinc-100 text-wrap",
+              "text-[var(--text-primary)] text-wrap",
               "overflow-y-auto resize-none",
               "focus-visible:ring-0 focus-visible:ring-offset-0",
               "transition-all duration-200 ease-out", 
@@ -274,7 +268,7 @@ export function AIInput({
                 ease: "linear",
                 times: [0, 0.5, 0.5, 1] 
               }}
-              className="w-full h-full bg-black dark:bg-white rounded-full"
+              className="w-full h-full bg-[var(--text-primary)] rounded-full"
             />
           </motion.div>
 
@@ -286,7 +280,7 @@ export function AIInput({
               inputValue ? "right-16" : "right-6"
             )}
           >
-            <Mic className="w-5 h-5 text-black/70 dark:text-white/70" />
+            <Mic className="w-5 h-5 text-[var(--text-secondary)]" />
           </div>
 
           <button
@@ -294,14 +288,14 @@ export function AIInput({
             type="button"
             className={cn(
               "absolute top-1/2 -translate-y-1/2 right-6",
-              "rounded-xl bg-black/5 dark:bg-white/10 py-2 px-2",
+              "rounded-xl bg-[var(--bg-hover)] py-2 px-2",
               "transition-all duration-200 ease-out",
               inputValue
                 ? "opacity-100 scale-100"
                 : "opacity-0 scale-95 pointer-events-none"
             )}
           >
-            <CornerRightUp className="w-5 h-5 text-black/70 dark:text-white/70" />
+            <CornerRightUp className="w-5 h-5 text-[var(--text-secondary)]" />
           </button>
         </motion.div>
       </motion.div>

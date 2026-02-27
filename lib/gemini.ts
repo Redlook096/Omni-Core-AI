@@ -1,12 +1,29 @@
 import { GoogleGenAI } from "@google/genai";
 
+export async function generateTitle(message: string): Promise<string> {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate a very short title (1 to 4 words maximum) summarizing this message: "${message}". Do not use quotes or punctuation. Just the words.`,
+      config: {
+        temperature: 0.7,
+      }
+    });
+    return response.text?.trim() || "New Chat";
+  } catch (error) {
+    console.error("Error generating title:", error);
+    return "New Chat";
+  }
+}
+
 export async function* streamChat(
   history: { role: 'user' | 'model'; content: string }[],
   newMessage: string,
   customPersona?: string,
   isRegeneration: boolean = false
 ) {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   // Adaptive System Instruction: Minimalist Conversation + Structured Research
   const baseInstruction = `
@@ -41,12 +58,20 @@ export async function* streamChat(
     finalSystemInstruction += `\n\n[INSTRUCTION]: Regenerate this response. Change the structure or angle. If the previous answer was too long, make this one concise. If it was too short, expand.`;
   }
 
+  // Filter out the last message if it matches newMessage to avoid duplication in history
+  const historyForModel = history.filter((msg, index) => {
+    if (index === history.length - 1 && msg.role === 'user' && msg.content === newMessage) {
+      return false;
+    }
+    return true;
+  });
+
   const chat = ai.chats.create({
-    model: 'gemini-flash-lite-latest',
+    model: 'gemini-3-flash-preview',
     config: {
       systemInstruction: finalSystemInstruction,
     },
-    history: history.map(msg => ({
+    history: historyForModel.map(msg => ({
       role: msg.role,
       parts: [{ text: msg.content }],
     })),

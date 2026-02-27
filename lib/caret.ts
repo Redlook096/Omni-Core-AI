@@ -1,7 +1,5 @@
 export function getCaretCoordinates(element: HTMLTextAreaElement, position: number) {
   const {
-    top,
-    left,
     width,
     height,
     fontFamily,
@@ -13,8 +11,6 @@ export function getCaretCoordinates(element: HTMLTextAreaElement, position: numb
     textTransform,
     wordSpacing,
     textIndent,
-    whiteSpace,
-    wordWrap,
     paddingLeft,
     paddingRight,
     paddingTop,

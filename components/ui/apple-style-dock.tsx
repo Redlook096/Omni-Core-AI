@@ -1,9 +1,7 @@
 import React from 'react';
 import {
   HomeIcon,
-  Terminal,
-  Settings,
-  Video,
+  Video
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -13,14 +11,7 @@ const data = [
   {
     title: 'Home',
     icon: (
-      <HomeIcon className='h-full w-full text-neutral-600 dark:text-neutral-300' />
-    ),
-    href: '#',
-  },
-  {
-    title: 'Settings',
-    icon: (
-      <Settings className='h-full w-full text-neutral-600 dark:text-neutral-300' />
+      <HomeIcon className='h-full w-full text-[var(--text-secondary)]' />
     ),
     href: '#',
   },
@@ -29,10 +20,10 @@ const data = [
 interface AppleStyleDockProps {
   show?: boolean;
   onHomeClick?: () => void;
-  onSettingsClick?: () => void;
+  onStoryClick?: () => void;
 }
 
-export function AppleStyleDock({ show = true, onHomeClick, onSettingsClick }: AppleStyleDockProps) {
+export function AppleStyleDock({ show = true, onHomeClick, onStoryClick }: AppleStyleDockProps) {
   return (
     <AnimatePresence>
       <motion.div 
@@ -58,10 +49,10 @@ export function AppleStyleDock({ show = true, onHomeClick, onSettingsClick }: Ap
           {data.map((item, idx) => (
             <DockItem
               key={idx}
-              className='aspect-square rounded-full bg-neutral-200/50 dark:bg-neutral-800/50 border border-white/20 dark:border-white/10 shadow-sm backdrop-blur-sm cursor-pointer'
+              className='aspect-square rounded-full bg-[var(--bg-card)]/50 border border-[var(--border-color)] shadow-sm backdrop-blur-sm cursor-pointer'
               onClick={() => {
                 if (item.title === 'Home') onHomeClick?.();
-                if (item.title === 'Settings') onSettingsClick?.();
+                if (item.title === 'Creators Vid') onStoryClick?.();
               }}
             >
               <DockLabel>{item.title}</DockLabel>

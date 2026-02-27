@@ -115,8 +115,7 @@ export function Dock({
         className={cn(
           'mx-auto flex w-fit gap-4 rounded-2xl px-4',
           'border bg-transparent border-transparent', // Invisible by default
-          'hover:bg-neutral-50/10 hover:border-neutral-200/20 hover:backdrop-blur-md', // Visible on hover
-          'dark:hover:bg-neutral-900/10 dark:hover:border-white/10',
+          'hover:bg-[var(--bg-card)]/80 hover:border-[var(--border-color)] hover:backdrop-blur-md', // Visible on hover
           'transition-all duration-200',
           className
         )}
@@ -198,7 +197,7 @@ export function DockLabel({ children, className, ...rest }: DockLabelProps) {
           exit={{ opacity: 0, y: 0 }}
           transition={{ duration: 0.2 }}
           className={cn(
-            'absolute -top-6 left-1/2 w-fit whitespace-pre rounded-md border border-gray-200 bg-gray-100 px-2 py-0.5 text-xs text-neutral-700 dark:border-neutral-900 dark:bg-neutral-800 dark:text-white',
+            'absolute -top-6 left-1/2 w-fit whitespace-pre rounded-md border border-[var(--border-color)] bg-[var(--bg-card)] px-2 py-0.5 text-xs text-[var(--text-primary)]',
             className
           )}
           role='tooltip'

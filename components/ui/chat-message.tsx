@@ -3,9 +3,7 @@ import { cn } from '../../lib/utils';
 import { 
   Copy, 
   RotateCw, 
-  Check,
-  Bot,
-  User
+  Check
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Spinner } from './spinner';
@@ -16,7 +14,6 @@ export interface ChatMessageProps {
   content: string;
   onRegenerate?: () => void;
   isStreaming?: boolean;
-  typingSpeed?: 'slow' | 'normal' | 'fast';
 }
 
 const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' | 'normal' | 'fast' = 'normal') => {
@@ -25,7 +22,6 @@ const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' |
 
   useEffect(() => {
     if (!isEnabled) {
-      setDisplayedText(text);
       index.current = text.length;
       return;
     }
@@ -33,7 +29,7 @@ const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' |
     // If text was reset (e.g. new message), reset index
     if (text.length < index.current) {
         index.current = 0;
-        setDisplayedText('');
+        setTimeout(() => setDisplayedText(''), 0);
     }
     
     // If already caught up, do nothing
@@ -79,7 +75,7 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
       {parts.map((part, i) => {
         if (part.startsWith('***') && part.endsWith('***')) {
           return (
-            <h3 key={i} className="text-xl md:text-2xl font-bold mt-8 mb-4 text-white/95 tracking-tight border-b border-white/10 pb-2">
+            <h3 key={i} className="text-xl md:text-2xl font-bold mt-8 mb-4 text-[var(--text-primary)] tracking-tight border-b border-[var(--border-color)] pb-2">
               {part.slice(3, -3)}
             </h3>
           );
@@ -91,7 +87,7 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
           <span key={i}>
             {boldParts.map((subPart, j) => {
               if (subPart.startsWith('**') && subPart.endsWith('**')) {
-                return <strong key={j} className="font-bold text-white">{subPart.slice(2, -2)}</strong>;
+                return <strong key={j} className="font-bold text-[var(--text-primary)]">{subPart.slice(2, -2)}</strong>;
               }
 
               // Split by italics *
@@ -100,15 +96,15 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                 <span key={j}>
                   {italicParts.map((subSubPart, k) => {
                     if (subSubPart.startsWith('*') && subSubPart.endsWith('*')) {
-                      return <em key={k} className="italic text-neutral-300">{subSubPart.slice(1, -1)}</em>;
+                      return <em key={k} className="italic text-[var(--text-secondary)]">{subSubPart.slice(1, -1)}</em>;
                     }
                     
                     // Handle newlines and bullet points
                     return subSubPart.split('\n').map((line, l, arr) => (
                       <React.Fragment key={l}>
                         {line.trim().startsWith('- ') || line.trim().startsWith('• ') ? (
-                          <span className="flex items-start gap-3 ml-2 my-2 text-neutral-300">
-                             <span className="mt-2 w-1.5 h-1.5 rounded-full bg-neutral-400 shrink-0 opacity-80" />
+                          <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
+                             <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
                              <span className="flex-1 leading-relaxed">{line.trim().substring(2)}</span>
                           </span>
                         ) : (
@@ -130,38 +126,30 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
         <motion.span
           animate={{ opacity: [0, 1, 0] }}
           transition={{ duration: 0.8, repeat: Infinity }}
-          className="inline-block w-2 h-5 bg-white ml-1 align-middle"
+          className="inline-block w-2 h-5 bg-[var(--text-primary)] ml-1 align-middle"
         />
       )}
     </div>
   );
 });
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, typingSpeed = 'normal' }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming }) => {
   const isUser = role === 'user';
   const [isCopying, setIsCopying] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
   const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Use typewriter effect only for model messages that are streaming
-  const displayedContent = useTypewriter(content, isStreaming && !isUser, typingSpeed);
+  const displayedContent = useTypewriter(content, isStreaming && !isUser, 'normal');
 
   const handleCopy = async () => {
-    setIsCopying(true);
     await navigator.clipboard.writeText(content);
-    
-    // Smooth timing for the "Satisfying" feel
-    setTimeout(() => {
-      setIsCopying(false);
-      setIsCopied(true);
-      setTimeout(() => setIsCopied(false), 2500);
-    }, 800);
+    setIsCopied(true);
+    setTimeout(() => setIsCopied(false), 2000);
   };
 
   const handleRegenerateClick = () => {
-    setIsRegenerating(true);
     onRegenerate?.();
-    setTimeout(() => setIsRegenerating(false), 2500); // Sync with the 2s logic
   };
 
   // If content is empty and it's the model, show the MorphingSquare loader
@@ -181,7 +169,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
     >
       {/* Thread Line for AI messages */}
       {!isUser && (
-        <div className="absolute left-[-20px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-white/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 hidden md:block" />
+        <div className="absolute left-[-20px] top-0 bottom-0 w-[1px] bg-gradient-to-b from-transparent via-[var(--border-color)] to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 hidden md:block" />
       )}
 
       <div className={cn(
@@ -199,7 +187,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               className="flex items-center gap-3 py-4 px-2"
             >
                <MorphingSquare className="w-3 h-3 md:w-4 md:h-4" />
-               <span className="text-sm text-neutral-500 animate-pulse">Thinking...</span>
+               <span className="text-sm text-[var(--text-muted)] animate-pulse">Thinking...</span>
             </motion.div>
           ) : (
             <motion.div
@@ -214,8 +202,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               className={cn(
                 "text-[15px] leading-7 md:text-[16px] relative transition-all duration-300",
                 isUser 
-                  ? "bg-[#27272a] text-white px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85vw] md:max-w-[600px]" 
-                  : "text-neutral-200 px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
+                  ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85vw] md:max-w-[600px]" 
+                  : "text-[var(--text-primary)] px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
               )}
             >
               {isUser ? content : <FormatText text={displayedContent} isStreaming={isStreaming} />}
@@ -225,25 +213,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
         
         {!isUser && !showLoader && content && (
           <div className="flex items-center gap-2 mt-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
-            {/* Copy Button with Ring Spinner */}
+            {/* Copy Button */}
             <motion.button 
               onClick={handleCopy}
-              whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.1)" }}
+              whileHover={{ scale: 1.1, backgroundColor: "var(--bg-hover)" }}
               whileTap={{ scale: 0.9 }}
-              className="p-1.5 text-neutral-500 hover:text-neutral-300 rounded-lg transition-colors relative overflow-hidden"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition-colors relative overflow-hidden"
               title="Copy"
             >
               <AnimatePresence mode='wait' initial={false}>
-                {isCopying ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                  >
-                    <Spinner variant="ring" size={14} className="text-neutral-400" />
-                  </motion.div>
-                ) : isCopied ? (
+                {isCopied ? (
                   <motion.div
                     key="check"
                     initial={{ scale: 0.5, opacity: 0, rotate: -45 }}
@@ -267,35 +246,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               </AnimatePresence>
             </motion.button>
 
-            {/* Regenerate Button with Ring Spinner */}
+            {/* Regenerate Button */}
             <motion.button 
               onClick={handleRegenerateClick}
-              whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.1)" }}
+              whileHover={{ scale: 1.1, backgroundColor: "var(--bg-hover)" }}
               whileTap={{ scale: 0.9 }}
-              className="p-1.5 text-neutral-500 hover:text-neutral-300 rounded-lg transition-colors"
+              className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-secondary)] rounded-lg transition-colors"
               title="Regenerate response"
             >
-              <AnimatePresence mode='wait' initial={false}>
-                {isRegenerating ? (
-                  <motion.div
-                    key="loading"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                  >
-                    <Spinner variant="ring" size={14} className="text-white" />
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="icon"
-                    initial={{ opacity: 0, scale: 0.5 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.5 }}
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                  </motion.div>
-                )}
-              </AnimatePresence>
+              <RotateCw className="w-3.5 h-3.5" />
             </motion.button>
           </div>
         )}
