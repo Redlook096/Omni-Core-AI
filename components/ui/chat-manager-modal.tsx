@@ -20,6 +20,7 @@ interface ChatManagerModalProps {
   onClose: () => void;
   history: ChatSession[];
   setHistory: React.Dispatch<React.SetStateAction<ChatSession[]>>;
+  currentSessionId: string | null;
   setCurrentSessionId: React.Dispatch<React.SetStateAction<string | null>>;
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   setHasStarted: React.Dispatch<React.SetStateAction<boolean>>;
@@ -30,6 +31,7 @@ export function ChatManagerModal({
   onClose,
   history,
   setHistory,
+  currentSessionId,
   setCurrentSessionId,
   setMessages,
   setHasStarted
@@ -49,7 +51,7 @@ export function ChatManagerModal({
 
   const toggleAll = () => {
     if (selectedIds.size === history.length) {
-      setSelectedIds(newSelected => new Set());
+      setSelectedIds(new Set());
     } else {
       setSelectedIds(new Set(history.map(s => s.id)));
     }
@@ -99,7 +101,7 @@ export function ChatManagerModal({
         const data = JSON.parse(jsonStr);
         
         if (data.chats && Array.isArray(data.chats)) {
-          const importedChats: ChatSession[] = data.chats.map((c: any) => ({
+          const importedChats: ChatSession[] = data.chats.map((c: { id: string, title: string, date: string, messages: Message[] }) => ({
             ...c,
             // Ensure unique IDs to avoid collisions
             id: `imported-${Date.now()}-${Math.random().toString(36).substring(7)}`,
@@ -130,11 +132,11 @@ export function ChatManagerModal({
       setHistory(prev => prev.filter(s => !selectedIds.has(s.id)));
       
       // If current session is deleted, reset view
-      setHistory(prev => {
-        const currentStillExists = prev.some(s => selectedIds.has(s.id));
-        // We need to check if the currently active session was deleted
-        return prev;
-      });
+      if (currentSessionId && selectedIds.has(currentSessionId)) {
+        setCurrentSessionId(null);
+        setMessages([]);
+        setHasStarted(false);
+      }
       
       setSelectedIds(new Set());
     }
@@ -195,7 +197,7 @@ export function ChatManagerModal({
               />
               <button
                 onClick={() => fileInputRef.current?.click()}
-                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--bg-hover)] hover:bg-[var(--border-color)] rounded-lg transition-colors text-sm font-medium text-[var(--text-primary)]"
+                className="flex items-center gap-2 px-3 py-1.5 bg-transparent hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm font-medium text-[var(--text-primary)]"
               >
                 <Upload className="w-4 h-4" />
                 Import
@@ -203,7 +205,7 @@ export function ChatManagerModal({
               <button
                 onClick={handleExport}
                 disabled={selectedIds.size === 0}
-                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--text-primary)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-[var(--bg-app)]"
+                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-color)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-white"
               >
                 <Download className="w-4 h-4" />
                 Export
@@ -245,7 +247,7 @@ export function ChatManagerModal({
                         {session.title}
                       </div>
                       <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                        {new Date(session.date).toLocaleDateString()} • {session.messages.length} messages
+                        {new Date(session.date).toLocaleDateString('en-GB')} • {session.messages.length} messages
                       </div>
                     </div>
                   </div>

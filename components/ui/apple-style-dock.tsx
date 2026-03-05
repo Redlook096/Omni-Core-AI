@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   HomeIcon,
-  Video
+  VideoIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -12,6 +12,13 @@ const data = [
     title: 'Home',
     icon: (
       <HomeIcon className='h-full w-full text-[var(--text-secondary)]' />
+    ),
+    href: '#',
+  },
+  {
+    title: 'Creators Vid',
+    icon: (
+      <VideoIcon className='h-full w-full text-[var(--text-secondary)]' />
     ),
     href: '#',
   },
@@ -27,11 +34,10 @@ export function AppleStyleDock({ show = true, onHomeClick, onStoryClick }: Apple
   return (
     <AnimatePresence>
       <motion.div 
-        className='fixed bottom-4 left-1/2 -translate-x-1/2 w-max z-50'
-        initial={{ y: 150, x: "-50%", opacity: 0 }}
+        className='relative w-max z-50'
+        initial={{ y: 150, opacity: 0 }}
         animate={{ 
           y: show ? 0 : 150, 
-          x: "-50%", 
           opacity: show ? 1 : 0 
         }}
         transition={{ 
@@ -40,7 +46,7 @@ export function AppleStyleDock({ show = true, onHomeClick, onStoryClick }: Apple
         }}
       >
         <Dock 
-          className='items-end pb-3' 
+          className='items-center pt-3' 
           magnification={80} 
           distance={100} 
           panelHeight={68} 

@@ -1,19 +1,21 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { flushSync } from 'react-dom';
 import { PromptInputBox } from './components/ui/prompt-input-box';
 import { AppleStyleDock } from './components/ui/apple-style-dock';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
-import { streamChat, generateTitle } from './lib/gemini';
+import { streamChat, generateTitle, generateSuggestions } from './lib/gemini';
 import { AnimatePresence, motion } from 'framer-motion';
-import { ChevronDown, PanelLeft, SquarePen, Plus, Search, User, X, Check, Zap, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Compass, HelpCircle, Download, Upload } from 'lucide-react';
-import { SettingsModal } from './components/ui/settings-modal';
+import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, HelpCircle, Download, Code, Zap, BarChart, Bug, Languages } from 'lucide-react';
 import { ThemeToggle } from './components/ui/theme-toggle';
 import { FakeTextStory } from './components/ui/fake-text-story';
 import { CreatorsMenu } from './components/ui/creators-menu';
 import { TextShimmer } from './components/ui/text-shimmer';
 import { ChatManagerModal } from './components/ui/chat-manager-modal';
+import { SettingsModal } from './components/ui/settings-modal';
+import { CodeRunner } from './components/ui/code-runner';
+import { SiriOrb } from './components/SiriOrb';
 import { cn } from './lib/utils';
+import { DEFAULT_SYSTEM_INSTRUCTION } from './lib/constants';
 
 interface Message {
   role: 'user' | 'model';
@@ -65,6 +67,50 @@ const itemVariants = {
   }
 };
 
+interface Suggestion {
+  iconName: 'FileText' | 'Lightbulb' | 'MessageSquare' | 'Code' | 'Zap' | 'BarChart' | 'Bug' | 'Languages' | 'SquarePen' | 'Settings';
+  text: string;
+  subtext: string;
+  prompt?: string;
+  autoSend?: boolean;
+  action?: 'open-runner' | 'open-settings' | 'open-story' | 'toggle-theme';
+}
+
+const SUGGESTIONS_POOL: Suggestion[] = [
+  { iconName: 'Code', text: 'Deep Code Analyzer', subtext: 'Identify bugs & optimize', prompt: 'Act as a Senior Staff Engineer. Analyze the following code for performance bottlenecks, security vulnerabilities, and architectural flaws. Provide a structured report with actionable fixes:\n\n', autoSend: false },
+  { iconName: 'Zap', text: 'Strategic Planner', subtext: 'Multi-step execution plan', prompt: 'Act as a Strategic Mastermind. Break down the following goal into a comprehensive, multi-step execution plan with timelines, risk assessments, and resource allocation:\n\n', autoSend: false },
+  { iconName: 'BarChart', text: 'Data Insights Engine', subtext: 'Statistical anomaly detection', prompt: 'Act as a Lead Data Scientist. Analyze this dataset. Identify statistical anomalies, hidden correlations, and predictive trends. Output the results in a structured JSON format:\n\n', autoSend: false },
+  { iconName: 'FileText', text: 'Contract Reviewer', subtext: 'Legal loophole detection', prompt: 'Act as an Expert Legal Counsel. Review the following text for potential loopholes, ambiguous clauses, and liabilities. Highlight critical risks and suggest precise revisions:\n\n', autoSend: false },
+  { iconName: 'Bug', text: 'Root Cause Diagnostics', subtext: 'System failure analysis', prompt: 'Act as a Site Reliability Engineer. Diagnose the root cause of the following system error or log output. Provide a step-by-step mitigation strategy and a post-mortem summary:\n\n', autoSend: false },
+  { iconName: 'Languages', text: 'Semantic Translator', subtext: 'Preserve cultural nuance', prompt: 'Act as a Master Linguist. Translate the following text, but preserve all cultural nuances, idioms, and emotional undertones. Provide the translation along with a breakdown of the linguistic choices made:\n\n', autoSend: false },
+  { iconName: 'SquarePen', text: 'Code Playground', subtext: 'Write & run code instantly', action: 'open-runner' },
+  { iconName: 'Settings', text: 'App Preferences', subtext: 'Customize your experience', action: 'open-settings' },
+  { iconName: 'MessageSquare', text: 'Immersive Story', subtext: 'Enter story mode', action: 'open-story' }
+];
+
+const AnimatedMenuIcon = ({ isOpen }: { isOpen: boolean }) => (
+  <div className="relative w-5 h-5 flex justify-center items-center">
+    <motion.span
+      initial={false}
+      animate={isOpen ? { rotate: 45, y: 6 } : { rotate: 0, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="w-5 h-[2px] bg-current rounded-full absolute top-[4px] origin-center"
+    />
+    <motion.span
+      initial={false}
+      animate={isOpen ? { opacity: 0, scale: 0.5 } : { opacity: 1, scale: 1 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="w-5 h-[2px] bg-current rounded-full absolute top-[10px]"
+    />
+    <motion.span
+      initial={false}
+      animate={isOpen ? { rotate: -45, y: -6 } : { rotate: 0, y: 0 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+      className="w-5 h-[2px] bg-current rounded-full absolute top-[16px] origin-center"
+    />
+  </div>
+);
+
 export default function App() {
   const [currentView, setCurrentView] = useState<'chat' | 'creators-menu' | 'story'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,42 +119,30 @@ export default function App() {
   const [isStoryFullscreen, setIsStoryFullscreen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isUpgradeOpen, setIsUpgradeOpen] = useState(false);
   const [isDark, setIsDark] = useState(true);
   const [isMobile, setIsMobile] = useState(false);
   const [isChatManagerOpen, setIsChatManagerOpen] = useState(false);
-
-  useEffect(() => {
-    const checkMobile = () => setIsMobile(window.innerWidth < 768);
-    checkMobile();
-    window.addEventListener('resize', checkMobile);
-    return () => window.removeEventListener('resize', checkMobile);
-  }, []);
-
-  const toggleTheme = (e?: React.MouseEvent) => {
-    setIsDark(!isDark);
-  };
-
-  useEffect(() => {
-    // Keep this for initial load or if skipped
-    if (isDark) {
-      document.documentElement.classList.remove('light');
-    } else {
-      document.documentElement.classList.add('light');
-    }
-  }, [isDark]);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [language, setLanguage] = useState('English');
+  const [aiMood, setAiMood] = useState('Neutral');
+  const [responseLength, setResponseLength] = useState<'short' | 'medium' | 'long'>('medium');
+  const [creativityLevel, setCreativityLevel] = useState<'low' | 'medium' | 'high'>('medium');
+  const [accentColor, setAccentColor] = useState<'blue' | 'purple' | 'green' | 'orange'>('blue');
+  const [currentSuggestions, setCurrentSuggestions] = useState<Suggestion[]>([]);
+  const [inputValue, setInputValue] = useState('');
+  const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, language: string}>({ isOpen: false, code: '', language: '' });
+  const handleSubmitRef = useRef<(value: string) => void>();
   
   const [history, setHistory] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem('chatHistory');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        return parsed.map((s: any) => ({
+        return parsed.map((s: { id: string, title: string, date: string, messages: Message[] }) => ({
           ...s,
           date: new Date(s.date)
         }));
-      } catch (e) {
+      } catch {
         return [];
       }
     }
@@ -127,9 +161,117 @@ export default function App() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
+  const mainContentRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUp = useRef(false);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // Apply accent color
+  useEffect(() => {
+    const root = document.documentElement;
+    const colorMap = {
+      blue: '#3b82f6',
+      purple: '#a855f7',
+      green: '#10b981',
+      orange: '#f97316'
+    };
+    root.style.setProperty('--accent-color', colorMap[accentColor]);
+  }, [accentColor]);
+
+  // Listen for custom run-code and set-prompt events
+  useEffect(() => {
+    const handleRunCode = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setRunnerState({
+        isOpen: true,
+        code: customEvent.detail.code,
+        language: customEvent.detail.language
+      });
+    };
+    
+    const handleSetPrompt = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      setInputValue(customEvent.detail);
+      // Focus the input if possible
+      const inputEl = document.querySelector('textarea');
+      if (inputEl) {
+        inputEl.focus();
+      }
+    };
+
+    const handleAutoFixCode = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { code, language, error } = customEvent.detail;
+      const prompt = `The following ${language} code failed to execute:\n\n\`\`\`${language}\n${code}\n\`\`\`\n\nIt produced this error:\n\`\`\`\n${error}\n\`\`\`\n\nPlease fix the code and provide the fully functional version. Ensure it is 100% functional and fixes the error.`;
+      
+      // Close the code runner so they can see the chat
+      setRunnerState(prev => ({ ...prev, isOpen: false }));
+      
+      // Send the message
+      if (handleSubmitRef.current) {
+        handleSubmitRef.current(prompt);
+      }
+    };
+
+    window.addEventListener('run-code', handleRunCode);
+    window.addEventListener('set-prompt', handleSetPrompt);
+    window.addEventListener('auto-fix-code', handleAutoFixCode);
+    return () => {
+      window.removeEventListener('run-code', handleRunCode);
+      window.removeEventListener('set-prompt', handleSetPrompt);
+      window.removeEventListener('auto-fix-code', handleAutoFixCode);
+    };
+  }, []);
+  useEffect(() => {
+    if (!hasStarted) {
+      setInputValue(''); // Clear input on new chat
+      
+      // Generate dynamic suggestions based on history
+      const fetchSuggestions = async () => {
+        const suggestions = await generateSuggestions(history);
+        if (suggestions && suggestions.length > 0) {
+          setCurrentSuggestions(suggestions);
+        } else {
+          // Fallback if generation fails
+          const shuffled = [...SUGGESTIONS_POOL].sort(() => 0.5 - Math.random());
+          setCurrentSuggestions(shuffled.slice(0, 3));
+        }
+      };
+      
+      fetchSuggestions();
+    }
+  }, [hasStarted, history]);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  const toggleTheme = () => {
+    setIsDark(!isDark);
+  };
+
+  useEffect(() => {
+    // Keep this for initial load or if skipped
+    if (isDark) {
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.add('light');
+    }
+  }, [isDark]);
+
+  const handleScroll = () => {
+    if (!mainContentRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = mainContentRef.current;
+    // Check if we are near the bottom of the container
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 150;
+    isUserScrolledUp.current = !isAtBottom;
+  };
+
+  const scrollToBottom = (force = false) => {
+    if (!isUserScrolledUp.current || force) {
+      messagesEndRef.current?.scrollIntoView({ behavior: force ? 'smooth' : 'auto' });
+    }
   };
 
   useEffect(() => {
@@ -184,6 +326,7 @@ export default function App() {
         setHasStarted(session.messages.length > 0);
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Empty dependency array to run only on mount
 
   const handleHomeClick = () => {
@@ -197,13 +340,13 @@ export default function App() {
 
   const handleSubmit = async (value: string) => {
     if (!value.trim()) return;
+    
+    setInputValue('');
 
     let sessionId = currentSessionId;
-    let isNewSession = false;
     if (!sessionId) {
       sessionId = Date.now().toString();
       setCurrentSessionId(sessionId);
-      isNewSession = true;
       const newSession: ChatSession = {
         id: sessionId,
         title: "Generating title...",
@@ -238,13 +381,17 @@ export default function App() {
     ];
     setMessages(newMessages);
     setIsLoading(true);
+    
+    // Force scroll to bottom when user sends a message
+    setTimeout(() => scrollToBottom(true), 100);
 
     try {
       // Add placeholder for AI response
       setMessages(prev => [...prev, { role: 'model', content: '' }]);
       
       let fullResponse = '';
-      const stream = streamChat(newMessages, value);
+      const customPersona = `You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const stream = streamChat(newMessages, value, customPersona);
       
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -262,6 +409,10 @@ export default function App() {
     }
   };
 
+  useEffect(() => {
+    handleSubmitRef.current = handleSubmit;
+  });
+
   const handleRegenerate = async (index: number) => {
     if (index === 0) return;
     const previousUserMessage = messages[index - 1];
@@ -276,7 +427,8 @@ export default function App() {
     let accumulatedResponse = '';
     
     try {
-      const stream = streamChat(historyUpToNow, previousUserMessage.content, undefined, true);
+      const customPersona = `You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const stream = streamChat(historyUpToNow, previousUserMessage.content, customPersona, true);
       
       for await (const chunk of stream) {
         accumulatedResponse += chunk;
@@ -323,9 +475,6 @@ export default function App() {
   };
 
   // Settings State
-  const [systemInstruction, setSystemInstruction] = useState('');
-  const [typingSpeed, setTypingSpeed] = useState<'slow' | 'normal' | 'fast'>('normal');
-  const [fontSize, setFontSize] = useState<'small' | 'medium' | 'large'>('medium');
   const [showToast, setShowToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
 
@@ -375,9 +524,20 @@ export default function App() {
 
   return (
     <div className={cn(
-      "min-h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col items-center relative overflow-hidden font-sans transition-colors duration-300",
+      "h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col items-center relative font-sans transition-colors duration-300 overflow-hidden",
       getFontSizeClass()
     )}>
+      
+      {/* Global Sidebar Toggle Button */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        className={cn(
+          "fixed top-[14px] left-[18px] z-[80] p-2 rounded-lg transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0",
+          "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+        )}
+      >
+        <AnimatedMenuIcon isOpen={isSidebarOpen} />
+      </button>
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -414,16 +574,10 @@ export default function App() {
       >
         <div className="p-3 space-y-2">
           {/* Sidebar Header with Close Button */}
-          <motion.div variants={itemVariants} className="flex items-center justify-between px-2 mb-2 h-10">
-            <button 
-              onClick={() => setIsSidebarOpen(false)}
-              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              <PanelLeft className="w-5 h-5" />
-            </button>
+          <motion.div variants={itemVariants} className="flex items-center justify-end px-2 mb-2 h-10">
             <button 
               onClick={handleHomeClick}
-              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] outline-none focus:outline-none"
             >
               <SquarePen className="w-5 h-5" />
             </button>
@@ -432,7 +586,7 @@ export default function App() {
           <motion.button 
             variants={itemVariants}
             onClick={handleHomeClick}
-            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors group text-sm text-[var(--text-primary)] h-10"
+            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors group text-sm text-[var(--text-primary)] h-10 outline-none focus:outline-none"
           >
             <Plus className="w-4 h-4" />
             <span>New chat</span>
@@ -514,7 +668,7 @@ export default function App() {
                     className="flex-1 text-left px-3 text-sm text-[var(--text-primary)] truncate flex items-center h-full"
                   >
                     {session.title === "Generating title..." ? (
-                      <TextShimmer className="text-xs" duration={1.5}>
+                      <TextShimmer as="span" className="text-xs" duration={1.5}>
                         Generating title...
                       </TextShimmer>
                     ) : (
@@ -580,37 +734,19 @@ export default function App() {
 
       {/* Main Content Area */}
       <motion.div 
+        ref={mainContentRef}
+        onScroll={handleScroll}
         animate={{ paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px" }}
         transition={SIDEBAR_TRANSITION}
-        className="flex-1 w-full flex flex-col items-center relative min-h-screen"
+        className="flex-1 w-full flex flex-col items-center relative h-screen overflow-y-auto overflow-x-hidden"
       >
         
-        {/* Header Toggle (Visible when sidebar closed) */}
-        <motion.div 
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          className="absolute top-0 left-0 right-0 h-14 flex items-center justify-between px-4 z-50 pointer-events-none"
-        >
-          <div className="pointer-events-auto">
-            <AnimatePresence>
-              {!isSidebarOpen && (
-                <motion.button 
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -20 }}
-                  onClick={() => setIsSidebarOpen(true)}
-                  className="p-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)] mt-2"
-                >
-                  <PanelLeft className="w-5 h-5" />
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
-        </motion.div>
-
         {/* Scrollable Content Container */}
         {currentView === 'chat' ? (
-          <div className="w-full flex flex-col items-center pt-8 md:pt-12 pb-40 px-4">
+          <div className={cn(
+            "w-full flex flex-col items-center px-4",
+            !hasStarted ? "h-screen justify-center pb-20" : "pt-8 md:pt-12 pb-40"
+          )}>
             <div className="w-full max-w-3xl flex flex-col gap-8">
               
               {/* Intro Title & Suggestions */}
@@ -622,40 +758,85 @@ export default function App() {
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, filter: "blur(10px)" }}
                     transition={{ duration: 0.5 }}
-                    className="mt-[10vh] flex flex-col items-center gap-8 w-full"
+                    className="flex flex-col items-center gap-6 w-full"
                   >
+                    {/* AI Assistant Orb */}
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.8, filter: "blur(10px)" }}
+                      animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+                      transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+                      className="relative flex items-center justify-center mb-10 mt-4"
+                    >
+                      <SiriOrb size="112px" />
+                    </motion.div>
+
                     <GradualSpacing 
                        text="What can I help with?"
-                       className="text-4xl md:text-5xl font-medium text-[var(--text-primary)] tracking-tight text-center opacity-90"
+                       className="text-4xl md:text-5xl font-medium text-[var(--text-primary)] tracking-tight text-center opacity-90 mb-2"
                        delayMultiple={0.04}
                        baseDelay={0.2}
                     />
                     
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      transition={{ delay: 0.2, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                      className="w-full pointer-events-auto"
+                    >
+                      <PromptInputBox
+                        placeholder="Ask anything..."
+                        onSend={(msg) => handleSubmit(msg)}
+                        isLoading={isLoading}
+                        value={inputValue}
+                        onChange={setInputValue}
+                        inputStyle={inputStyle}
+                      />
+                    </motion.div>
+                    
                     {/* Quick Action Suggestions */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-2xl px-4">
-                      {[
-                        { icon: <FileText className="w-4 h-4" />, text: "Summarize a long document", subtext: "Extract key points quickly" },
-                        { icon: <Lightbulb className="w-4 h-4" />, text: "Brainstorm creative ideas", subtext: "For your next big project" },
-                        { icon: <MessageSquare className="w-4 h-4" />, text: "Draft a professional email", subtext: "To a client or colleague" },
-                        { icon: <Compass className="w-4 h-4" />, text: "Explain a complex topic", subtext: "Make it easy to understand" }
-                      ].map((suggestion, i) => (
-                        <motion.button
-                          key={i}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: 0.6 + (i * 0.1), duration: 0.4 }}
-                          onClick={() => handleSubmit(suggestion.text)}
-                          className="flex flex-col items-start p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/50 hover:bg-[var(--bg-hover)] transition-all text-left group shadow-sm"
-                        >
-                          <div className="flex items-center gap-2 text-[var(--text-primary)] font-medium text-sm mb-1">
-                            <span className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">{suggestion.icon}</span>
-                            {suggestion.text}
-                          </div>
-                          <div className="text-xs text-[var(--text-muted)]">
-                            {suggestion.subtext}
-                          </div>
-                        </motion.button>
-                      ))}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-2">
+                      {currentSuggestions.map((suggestion, i) => {
+                        const IconComponent = {
+                          FileText, Lightbulb, MessageSquare, Code, Zap, BarChart, Bug, Languages, SquarePen, Settings
+                        }[suggestion.iconName];
+                        
+                        return (
+                          <motion.button
+                            key={i}
+                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                            animate={{ opacity: 1, y: 0, scale: 1 }}
+                            transition={{ delay: 0.2, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                            onClick={() => {
+                              if (suggestion.action) {
+                                if (suggestion.action === 'open-runner') setRunnerState({ isOpen: true, code: '', language: 'javascript' });
+                                else if (suggestion.action === 'open-settings') setIsSettingsOpen(true);
+                                else if (suggestion.action === 'open-story') setCurrentView('story');
+                                else if (suggestion.action === 'toggle-theme') setIsDark(!isDark);
+                              } else if (suggestion.prompt) {
+                                if (suggestion.autoSend) {
+                                  handleSubmit(suggestion.prompt);
+                                } else {
+                                  setInputValue(suggestion.prompt);
+                                  setTimeout(() => {
+                                    document.getElementById('prompt-textarea')?.focus();
+                                  }, 50);
+                                }
+                              }
+                            }}
+                            className="flex flex-col items-start p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/50 hover:bg-[var(--bg-hover)] transition-all text-left group shadow-sm"
+                          >
+                            <div className="flex items-center gap-2 text-[var(--text-primary)] font-medium text-sm mb-1">
+                              <span className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                                {IconComponent && <IconComponent className="w-4 h-4" />}
+                              </span>
+                              {suggestion.text}
+                            </div>
+                            <div className="text-xs text-[var(--text-muted)]">
+                              {suggestion.subtext}
+                            </div>
+                          </motion.button>
+                        );
+                      })}
                     </div>
                   </motion.div>
                 )}
@@ -672,16 +853,19 @@ export default function App() {
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className="w-full flex-1 flex flex-col gap-8"
                   >
-                    {messages.map((msg, idx) => (
-                      <ChatMessage 
-                        key={idx} 
-                        role={msg.role} 
-                        content={msg.content} 
-                        onRegenerate={() => handleRegenerate(idx)}
-                        isStreaming={isLoading && idx === messages.length - 1 && msg.role === 'model'}
-                        typingSpeed={typingSpeed}
-                      />
-                    ))}
+                    {messages.map((msg, idx) => {
+                      const isSearching = idx > 0 && messages[idx - 1].role === 'user' && messages[idx - 1].content.startsWith('[Search: ');
+                      return (
+                        <ChatMessage 
+                          key={idx} 
+                          role={msg.role} 
+                          content={msg.content} 
+                          onRegenerate={() => handleRegenerate(idx)}
+                          isStreaming={isLoading && idx === messages.length - 1 && msg.role === 'model'}
+                          isSearching={isSearching}
+                        />
+                      );
+                    })}
                     <div ref={messagesEndRef} className="h-4" />
                   </motion.div>
                 )}
@@ -700,48 +884,53 @@ export default function App() {
           </div>
         )}
 
-        {/* Input Area */}
-        {currentView === 'chat' && (
-          <motion.div 
-            layout
-            initial={false}
-            animate={{ 
-              pointerEvents: (hasStarted && isDockHovered) ? 'none' : 'auto',
-              paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px",
-              opacity: (hasStarted && isDockHovered) ? 0 : 1,
-              y: (hasStarted && isDockHovered) ? 20 : 0
-            }}
-            transition={SIDEBAR_TRANSITION}
-            className={cn(
-              "fixed bottom-0 left-0 right-0 z-30 flex justify-center pointer-events-none",
-              !hasStarted ? "bottom-[15vh]" : "bottom-10"
-            )}
-          >
-            <div className="w-full max-w-3xl px-4 pointer-events-auto">
-              <PromptInputBox
-                placeholder="Ask anything..."
-                onSend={(msg) => handleSubmit(msg)}
-                isLoading={isLoading}
-              />
-            </div>
-          </motion.div>
-        )}
-
       </motion.div>
 
-      {/* Dock Hover Trigger */}
+      {/* Input Area */}
+      {currentView === 'chat' && hasStarted && (
+        <motion.div 
+          initial={false}
+          animate={{ 
+            pointerEvents: (hasStarted && isDockHovered) ? 'none' : 'auto',
+            paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px",
+            opacity: (hasStarted && isDockHovered) ? 0 : 1,
+            y: (hasStarted && isDockHovered) ? 20 : 0
+          }}
+          transition={SIDEBAR_TRANSITION}
+          className="fixed bottom-10 left-0 right-0 z-30 flex justify-center pointer-events-none px-4"
+        >
+          <motion.div className="w-full max-w-3xl pointer-events-auto">
+            <PromptInputBox
+              placeholder="Ask anything..."
+              onSend={(msg) => handleSubmit(msg)}
+              isLoading={isLoading}
+              value={inputValue}
+              onChange={setInputValue}
+              inputStyle={inputStyle}
+            />
+          </motion.div>
+        </motion.div>
+      )}
+
+      {/* Dock Hover Trigger & Indicator */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (hasStarted || currentView !== 'chat') && (
         <div 
-          className="fixed bottom-0 left-0 w-full h-8 z-[200] bg-transparent"
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-64 h-6 z-[200] flex items-end justify-center pb-1 cursor-pointer group"
           onMouseEnter={() => setIsDockHovered(true)}
           onMouseLeave={() => setIsDockHovered(false)}
-        />
+        >
+          {/* Subtle Indicator Line */}
+          <div className={cn(
+            "w-16 h-1 rounded-full transition-all duration-300",
+            isDockHovered ? "bg-transparent" : "bg-[var(--text-muted)]/30 group-hover:bg-[var(--text-secondary)]/50 group-hover:w-24"
+          )} />
+        </div>
       )}
 
       {/* Dock */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (
         <div 
-          className="fixed bottom-0 left-0 w-full z-[200] pointer-events-none"
+          className="fixed bottom-4 left-0 w-full z-[200] pointer-events-none flex justify-center"
         >
           <div className="pointer-events-auto" onMouseEnter={() => setIsDockHovered(true)} onMouseLeave={() => setIsDockHovered(false)}>
              <AppleStyleDock 
@@ -766,6 +955,37 @@ export default function App() {
         setCurrentSessionId={setCurrentSessionId}
         setMessages={setMessages}
         setHasStarted={setHasStarted}
+      />
+      <SettingsModal
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onClearHistory={() => {
+          setHistory([]);
+          setMessages([]);
+          setHasStarted(false);
+          setCurrentSessionId(null);
+          localStorage.removeItem('chatHistory');
+          localStorage.removeItem('currentSessionId');
+        }}
+        language={language}
+        setLanguage={setLanguage}
+        aiMood={aiMood}
+        setAiMood={setAiMood}
+        responseLength={responseLength}
+        setResponseLength={setResponseLength}
+        creativityLevel={creativityLevel}
+        setCreativityLevel={setCreativityLevel}
+        accentColor={accentColor}
+        setAccentColor={setAccentColor}
+        isDark={isDark}
+        setIsDark={setIsDark}
+      />
+
+      <CodeRunner 
+        isOpen={runnerState.isOpen}
+        onClose={() => setRunnerState(prev => ({ ...prev, isOpen: false }))}
+        code={runnerState.code}
+        language={runnerState.language}
       />
 
     </div>

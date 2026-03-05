@@ -268,7 +268,7 @@ export function AIInput({
                 ease: "linear",
                 times: [0, 0.5, 0.5, 1] 
               }}
-              className="w-full h-full bg-[var(--text-primary)] rounded-full"
+              className="w-full h-full bg-[var(--accent-color)] rounded-full"
             />
           </motion.div>
 

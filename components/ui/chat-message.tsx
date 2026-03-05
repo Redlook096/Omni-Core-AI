@@ -3,17 +3,22 @@ import { cn } from '../../lib/utils';
 import { 
   Copy, 
   RotateCw, 
-  Check
+  Check,
+  Search
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Spinner } from './spinner';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { MorphingSquare } from './morphing-square';
+import { TextShimmer } from './text-shimmer';
 
 export interface ChatMessageProps {
   role: 'user' | 'model';
   content: string;
   onRegenerate?: () => void;
   isStreaming?: boolean;
+  typingSpeed?: 'slow' | 'normal' | 'fast';
+  isSearching?: boolean;
 }
 
 const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' | 'normal' | 'fast' = 'normal') => {
@@ -67,54 +72,187 @@ const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' |
 const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreaming?: boolean }) => {
   if (!text) return null;
 
-  // Split by headers ***
-  const parts = text.split(/(\*\*\*.*?\*\*\*)/g);
+  // Split by [Type: ...] blocks first
+  const blockParts = text.split(/(\[(?:Think|Search|Canvas):\s*[\s\S]*?(?:\]|$))/g);
 
   return (
     <div>
-      {parts.map((part, i) => {
-        if (part.startsWith('***') && part.endsWith('***')) {
+      {blockParts.map((blockPart, blockIdx) => {
+        const match = blockPart.match(/^\[(Think|Search|Canvas):\s*([\s\S]*?)(?:\]|$)/);
+        if (match) {
+          const type = match[1];
+          const content = match[2];
           return (
-            <h3 key={i} className="text-xl md:text-2xl font-bold mt-8 mb-4 text-[var(--text-primary)] tracking-tight border-b border-[var(--border-color)] pb-2">
-              {part.slice(3, -3)}
-            </h3>
+            <div key={blockIdx} className="my-4 p-4 rounded-xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm">
+              <div className="flex items-center gap-2 mb-2 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">
+                {type === 'Think' && <span className="w-2 h-2 rounded-full bg-purple-500 animate-pulse" />}
+                {type === 'Search' && (
+                  <motion.div
+                    animate={{ scale: [0.9, 1.1, 0.9], rotate: [-10, 10, -10] }}
+                    transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                    className="flex items-center justify-center w-4 h-4"
+                  >
+                    <Search className="w-4 h-4 text-blue-400" />
+                  </motion.div>
+                )}
+                {type === 'Canvas' && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
+                {type}
+              </div>
+              <TextShimmer duration={2} className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+                {content || '...'}
+              </TextShimmer>
+            </div>
           );
         }
 
-        // Split by bold **
-        const boldParts = part.split(/(\*\*.*?\*\*)/g);
+        // Split by code blocks first (matching both closed and unclosed blocks)
+        const codeBlockParts = blockPart.split(/(```[\s\S]*?(?:```|$))/g);
+
         return (
-          <span key={i}>
-            {boldParts.map((subPart, j) => {
-              if (subPart.startsWith('**') && subPart.endsWith('**')) {
-                return <strong key={j} className="font-bold text-[var(--text-primary)]">{subPart.slice(2, -2)}</strong>;
+          <span key={blockIdx}>
+            {codeBlockParts.map((codePart, codeIdx) => {
+              if (codePart.startsWith('```')) {
+                // It's a code block (closed or unclosed)
+                const isClosed = codePart.endsWith('```') && codePart.length >= 6;
+                const match = codePart.match(/```(\w+)?\n([\s\S]*?)(?:```|$)/);
+                const language = match ? match[1] || 'text' : 'text';
+                const code = match ? match[2] : codePart.slice(3, isClosed ? -3 : undefined);
+                
+                return (
+                  <div key={codeIdx} className="my-4 rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/10 shadow-lg">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2d2d] text-xs text-gray-400">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium text-gray-200">Code</span>
+                        <span>·</span>
+                        <span>{language}</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button 
+                          onClick={() => {
+                            navigator.clipboard.writeText(code);
+                            // Could add a toast here
+                          }}
+                          className="hover:text-white transition-colors flex items-center gap-1"
+                        >
+                          <Copy className="w-3 h-3" /> Copy
+                        </button>
+                        <button 
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('set-prompt', { detail: code }));
+                          }}
+                          className="hover:text-white transition-colors"
+                        >
+                          Edit
+                        </button>
+                        <button 
+                          onClick={() => {
+                            const blob = new Blob([code], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            
+                            // Map common languages to extensions
+                            const extMap: Record<string, string> = {
+                              'javascript': 'js', 'typescript': 'ts', 'python': 'py',
+                              'cpp': 'cpp', 'c++': 'cpp', 'c': 'c', 'java': 'java',
+                              'go': 'go', 'rust': 'rs', 'php': 'php', 'ruby': 'rb',
+                              'bash': 'sh', 'sh': 'sh', 'csharp': 'cs', 'cs': 'cs',
+                              'html': 'html', 'css': 'css', 'json': 'json', 'xml': 'xml',
+                              'sql': 'sql', 'markdown': 'md', 'md': 'md'
+                            };
+                            const ext = extMap[language.toLowerCase()] || 'txt';
+                            a.download = `snippet.${ext}`;
+                            
+                            document.body.appendChild(a);
+                            a.click();
+                            document.body.removeChild(a);
+                            URL.revokeObjectURL(url);
+                          }}
+                          className="hover:text-white transition-colors"
+                        >
+                          Download
+                        </button>
+                        <button 
+                          onClick={() => {
+                            window.dispatchEvent(new CustomEvent('run-code', { detail: { code, language } }));
+                          }}
+                          className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
+                        >
+                          Run code
+                        </button>
+                      </div>
+                    </div>
+                    <div className="overflow-x-auto text-sm font-mono text-gray-300">
+                      <SyntaxHighlighter
+                        language={language}
+                        style={vscDarkPlus}
+                        customStyle={{
+                          margin: 0,
+                          padding: '1rem',
+                          background: 'transparent',
+                        }}
+                      >
+                        {code}
+                      </SyntaxHighlighter>
+                    </div>
+                  </div>
+                );
               }
 
-              // Split by italics *
-              const italicParts = subPart.split(/(\*.*?\*)/g);
+              // Split by headers ***
+              const parts = codePart.split(/(\*\*\*.*?\*\*\*)/g);
+
               return (
-                <span key={j}>
-                  {italicParts.map((subSubPart, k) => {
-                    if (subSubPart.startsWith('*') && subSubPart.endsWith('*')) {
-                      return <em key={k} className="italic text-[var(--text-secondary)]">{subSubPart.slice(1, -1)}</em>;
+                <span key={codeIdx}>
+                  {parts.map((part, i) => {
+                    if (part.startsWith('***') && part.endsWith('***')) {
+                      return (
+                        <h3 key={i} className="text-xl md:text-2xl font-bold mt-8 mb-4 text-[var(--text-primary)] tracking-tight border-b border-[var(--border-color)] pb-2">
+                          {part.slice(3, -3)}
+                        </h3>
+                      );
                     }
-                    
-                    // Handle newlines and bullet points
-                    return subSubPart.split('\n').map((line, l, arr) => (
-                      <React.Fragment key={l}>
-                        {line.trim().startsWith('- ') || line.trim().startsWith('• ') ? (
-                          <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
-                             <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
-                             <span className="flex-1 leading-relaxed">{line.trim().substring(2)}</span>
-                          </span>
-                        ) : (
-                          <span className={cn(line.trim() === "" ? "block h-4" : "")}>
-                             {line}
-                          </span>
-                        )}
-                        {l < arr.length - 1 && line.trim() !== "" && !line.trim().startsWith('-') && !line.trim().startsWith('•') && <br />}
-                      </React.Fragment>
-                    ));
+
+                    // Split by bold **
+                    const boldParts = part.split(/(\*\*.*?\*\*)/g);
+                    return (
+                      <span key={i}>
+                        {boldParts.map((subPart, j) => {
+                          if (subPart.startsWith('**') && subPart.endsWith('**')) {
+                            return <strong key={j} className="font-bold text-[var(--text-primary)]">{subPart.slice(2, -2)}</strong>;
+                          }
+
+                          // Split by italics *
+                          const italicParts = subPart.split(/(\*.*?\*)/g);
+                          return (
+                            <span key={j}>
+                              {italicParts.map((subSubPart, k) => {
+                                if (subSubPart.startsWith('*') && subSubPart.endsWith('*')) {
+                                  return <em key={k} className="italic text-[var(--text-secondary)]">{subSubPart.slice(1, -1)}</em>;
+                                }
+                                
+                                // Handle newlines and bullet points
+                                return subSubPart.split('\n').map((line, l, arr) => (
+                                  <React.Fragment key={l}>
+                                    {line.trim().startsWith('- ') || line.trim().startsWith('• ') ? (
+                                      <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
+                                         <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
+                                         <span className="flex-1 leading-relaxed">{line.trim().substring(2)}</span>
+                                      </span>
+                                    ) : (
+                                      <span className={cn(line.trim() === "" ? "block h-4" : "")}>
+                                         {line}
+                                      </span>
+                                    )}
+                                    {l < arr.length - 1 && line.trim() !== "" && !line.trim().startsWith('-') && !line.trim().startsWith('•') && <br />}
+                                  </React.Fragment>
+                                ));
+                              })}
+                            </span>
+                          );
+                        })}
+                      </span>
+                    );
                   })}
                 </span>
               );
@@ -126,21 +264,27 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
         <motion.span
           animate={{ opacity: [0, 1, 0] }}
           transition={{ duration: 0.8, repeat: Infinity }}
-          className="inline-block w-2 h-5 bg-[var(--text-primary)] ml-1 align-middle"
+          className="inline-block w-2 h-5 bg-[var(--accent-color)] ml-1 align-middle"
         />
       )}
     </div>
   );
 });
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, typingSpeed = 'normal' }) => {
   const isUser = role === 'user';
-  const [isCopying, setIsCopying] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
-  const [isRegenerating, setIsRegenerating] = useState(false);
+
+  let displayContent = content;
+  if (isUser) {
+    const match = displayContent.match(/^\[(Canvas|Search|Think):\s*(.*)\]$/s);
+    if (match) {
+      displayContent = match[2];
+    }
+  }
 
   // Use typewriter effect only for model messages that are streaming
-  const displayedContent = useTypewriter(content, isStreaming && !isUser, 'normal');
+  const displayedContent = useTypewriter(content, isStreaming && !isUser, typingSpeed);
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -186,8 +330,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               transition={{ duration: 0.2 }}
               className="flex items-center gap-3 py-4 px-2"
             >
-               <MorphingSquare className="w-3 h-3 md:w-4 md:h-4" />
-               <span className="text-sm text-[var(--text-muted)] animate-pulse">Thinking...</span>
+               {isSearching ? (
+                 <>
+                   <motion.div
+                     animate={{ scale: [0.9, 1.1, 0.9], rotate: [-10, 10, -10] }}
+                     transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                     className="flex items-center justify-center w-4 h-4"
+                   >
+                     <Search className="w-4 h-4 text-blue-400" />
+                   </motion.div>
+                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Searching...</TextShimmer>
+                 </>
+               ) : (
+                 <>
+                   <MorphingSquare className="w-3 h-3 md:w-4 md:h-4" />
+                   <span className="text-sm text-[var(--text-muted)] animate-pulse">Thinking...</span>
+                 </>
+               )}
             </motion.div>
           ) : (
             <motion.div
@@ -206,7 +365,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
                   : "text-[var(--text-primary)] px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
               )}
             >
-              {isUser ? content : <FormatText text={displayedContent} isStreaming={isStreaming} />}
+              {isUser ? displayContent : <FormatText text={displayedContent} isStreaming={isStreaming} />}
             </motion.div>
           )}
         </AnimatePresence>

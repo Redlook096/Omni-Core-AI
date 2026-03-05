@@ -1,4 +1,4 @@
-import React, { useMemo, type JSX } from 'react';
+import React, { useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '../../lib/utils';
 
@@ -17,18 +17,19 @@ export function TextShimmer({
   duration = 2,
   spread = 2,
 }: TextShimmerProps) {
+  const MotionComponent = Component === 'span' ? motion.span : motion.p;
+
   const dynamicSpread = useMemo(() => {
     return children.length * spread;
   }, [children, spread]);
 
-  const MotionTag = motion[Component as keyof typeof motion] as any || motion.p;
-
   return (
-    <MotionTag
+    <MotionComponent
       className={cn(
         'relative inline-block bg-[length:250%_100%,auto] bg-clip-text',
-        'text-transparent [--base-color:var(--text-muted)] [--base-gradient-color:var(--text-primary)]',
+        'text-transparent [--base-color:#a1a1aa] [--base-gradient-color:#000]',
         '[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--base-gradient-color),#0000_calc(50%+var(--spread)))] [background-repeat:no-repeat,padding-box]',
+        'dark:[--base-color:#71717a] dark:[--base-gradient-color:#ffffff] dark:[--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--base-gradient-color),#0000_calc(50%+var(--spread)))]',
         className
       )}
       initial={{ backgroundPosition: '100% center' }}
@@ -46,6 +47,6 @@ export function TextShimmer({
       }
     >
       {children}
-    </MotionTag>
+    </MotionComponent>
   );
 }
