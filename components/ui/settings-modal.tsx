@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Zap, Settings, Palette, Moon, Sun, Monitor, Paintbrush, Globe, Smile, AlignLeft, Sparkles } from 'lucide-react';
+import { X, Trash2, Zap, Settings, Palette, Moon, Sun, Monitor, Paintbrush, Globe, Smile, AlignLeft, Sparkles, Type } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { t } from '../../lib/translations';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -15,8 +16,8 @@ interface SettingsModalProps {
   setResponseLength: (value: 'short' | 'medium' | 'long') => void;
   creativityLevel: 'low' | 'medium' | 'high';
   setCreativityLevel: (value: 'low' | 'medium' | 'high') => void;
-  accentColor: 'blue' | 'purple' | 'green' | 'orange';
-  setAccentColor: (value: 'blue' | 'purple' | 'green' | 'orange') => void;
+  fontSize: 'small' | 'base' | 'large';
+  setFontSize: (value: 'small' | 'base' | 'large') => void;
   isDark: boolean;
   setIsDark: (value: boolean) => void;
 }
@@ -33,17 +34,17 @@ export function SettingsModal({
   setResponseLength,
   creativityLevel,
   setCreativityLevel,
-  accentColor,
-  setAccentColor,
+  fontSize,
+  setFontSize,
   isDark,
   setIsDark
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'advanced'>('general');
 
   const tabs = [
-    { id: 'general', label: 'General', icon: Settings },
-    { id: 'appearance', label: 'Appearance', icon: Palette },
-    { id: 'advanced', label: 'Advanced', icon: Zap },
+    { id: 'general', label: t(language, 'general'), icon: Settings },
+    { id: 'appearance', label: t(language, 'appearance'), icon: Palette },
+    { id: 'advanced', label: t(language, 'advanced'), icon: Zap },
   ] as const;
 
   const languages = ['English', 'Spanish', 'French', 'German', 'Chinese', 'Japanese', 'Korean', 'Italian', 'Portuguese', 'Russian'];
@@ -70,7 +71,7 @@ export function SettingsModal({
             <div className="w-full md:w-64 bg-[var(--bg-app)]/50 border-b md:border-b-0 md:border-r border-[var(--border-color)] p-4 flex flex-row md:flex-col gap-2 overflow-x-auto md:overflow-y-auto">
               <div className="hidden md:flex items-center gap-2 px-2 py-4 mb-2">
                 <Settings className="w-5 h-5 text-[var(--text-secondary)]" />
-                <h2 className="text-xl font-bold text-[var(--text-primary)]">Settings</h2>
+                <h2 className="text-xl font-bold text-[var(--text-primary)]">{t(language, 'settings')}</h2>
               </div>
               
               {tabs.map((tab) => {
@@ -82,8 +83,8 @@ export function SettingsModal({
                     className={cn(
                       "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all whitespace-nowrap",
                       activeTab === tab.id
-                        ? "bg-[var(--accent-color)] text-white shadow-md"
-                        : "text-[var(--text-secondary)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                        ? "bg-zinc-200 dark:bg-zinc-800 text-[var(--text-primary)] shadow-sm"
+                        : "text-[var(--text-secondary)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                     )}
                   >
                     <Icon className="w-4 h-4" />
@@ -103,15 +104,15 @@ export function SettingsModal({
               </button>
 
               <div className="max-w-xl">
-                <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-8 capitalize">{activeTab}</h3>
+                <h3 className="text-2xl font-bold text-[var(--text-primary)] mb-8 capitalize">{t(language, activeTab)}</h3>
 
                 {activeTab === 'general' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Language */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
                       <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                         <Globe className="w-4 h-4" />
-                        AI Language
+                        {t(language, 'aiLanguage')}
                       </label>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                         {languages.map((lang) => (
@@ -121,21 +122,21 @@ export function SettingsModal({
                             className={cn(
                               "px-3 py-2 rounded-xl text-sm font-medium transition-all border",
                               language === lang
-                                ? "bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-sm"
-                                : "bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                                : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                             )}
                           >
-                            {lang}
+                            {t(language, lang)}
                           </button>
                         ))}
                       </div>
                     </div>
 
                     {/* AI Mood */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
                       <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                         <Smile className="w-4 h-4" />
-                        AI Personality / Mood
+                        {t(language, 'aiMood')}
                       </label>
                       <div className="flex flex-wrap gap-2">
                         {moods.map((mood) => (
@@ -145,26 +146,26 @@ export function SettingsModal({
                             className={cn(
                               "px-4 py-2 rounded-full text-sm font-medium transition-all border",
                               aiMood === mood
-                                ? "bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-sm"
-                                : "bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                                : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                             )}
                           >
-                            {mood}
+                            {t(language, mood)}
                           </button>
                         ))}
                       </div>
-                      <p className="text-xs text-[var(--text-muted)]">Changes the tone and style of the AI's responses.</p>
+                      <p className="text-xs text-[var(--text-muted)] mt-2">Changes the tone and style of the AI's responses.</p>
                     </div>
                   </div>
                 )}
 
                 {activeTab === 'appearance' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Theme */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
                       <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                         <Monitor className="w-4 h-4" />
-                        Theme
+                        {t(language, 'theme')}
                       </label>
                       <div className="grid grid-cols-2 gap-3">
                         <button
@@ -172,70 +173,61 @@ export function SettingsModal({
                           className={cn(
                             "flex items-center justify-center gap-2 p-3 rounded-xl border transition-all",
                             !isDark
-                              ? "bg-[var(--accent-color)] text-white border-[var(--accent-color)]"
-                              : "bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                              ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                              : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                           )}
                         >
                           <Sun className="w-4 h-4" />
-                          Light
+                          {t(language, 'light')}
                         </button>
                         <button
                           onClick={() => setIsDark(true)}
                           className={cn(
                             "flex items-center justify-center gap-2 p-3 rounded-xl border transition-all",
                             isDark
-                              ? "bg-[var(--accent-color)] text-white border-[var(--accent-color)]"
-                              : "bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                              ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                              : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                           )}
                         >
                           <Moon className="w-4 h-4" />
-                          Dark
+                          {t(language, 'dark')}
                         </button>
                       </div>
                     </div>
 
-                    {/* Accent Color */}
-                    <div className="space-y-4">
+                    {/* Font Size */}
+                    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
                       <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
-                        <Paintbrush className="w-4 h-4" />
-                        Accent Color
+                        <Type className="w-4 h-4" />
+                        {t(language, 'fontSize')}
                       </label>
-                      <div className="flex flex-wrap gap-3">
-                        {(['blue', 'purple', 'green', 'orange'] as const).map((color) => {
-                          const colorMap = {
-                            blue: 'bg-blue-500',
-                            purple: 'bg-purple-500',
-                            green: 'bg-emerald-500',
-                            orange: 'bg-orange-500'
-                          };
-                          return (
-                            <button
-                              key={color}
-                              onClick={() => setAccentColor(color)}
-                              className={cn(
-                                "w-12 h-12 rounded-full flex items-center justify-center transition-all border-2",
-                                accentColor === color
-                                  ? "border-[var(--text-primary)] scale-110 shadow-md"
-                                  : "border-transparent hover:scale-105",
-                                colorMap[color]
-                              )}
-                            >
-                              {accentColor === color && <div className="w-2 h-2 bg-white rounded-full" />}
-                            </button>
-                          );
-                        })}
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['small', 'base', 'large'] as const).map((size) => (
+                          <button
+                            key={size}
+                            onClick={() => setFontSize(size)}
+                            className={cn(
+                              "px-3 py-3 rounded-xl text-sm font-medium capitalize transition-all border",
+                              fontSize === size
+                                ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                                : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
+                            )}
+                          >
+                            {t(language, size)}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   </div>
                 )}
 
                 {activeTab === 'advanced' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                  <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                     {/* Response Length */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
                       <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                         <AlignLeft className="w-4 h-4" />
-                        Response Length
+                        {t(language, 'responseLength')}
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {(['short', 'medium', 'long'] as const).map((length) => (
@@ -245,21 +237,22 @@ export function SettingsModal({
                             className={cn(
                               "px-3 py-3 rounded-xl text-sm font-medium capitalize transition-all border",
                               responseLength === length
-                                ? "bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-sm"
-                                : "bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                                : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                             )}
                           >
-                            {length}
+                            {t(language, length)}
                           </button>
                         ))}
                       </div>
+                      <p className="text-xs text-[var(--text-muted)] mt-2">Controls how verbose the AI's responses are.</p>
                     </div>
 
                     {/* Creativity Level */}
-                    <div className="space-y-4">
+                    <div className="space-y-4 bg-zinc-50 dark:bg-zinc-800/30 p-5 rounded-2xl border border-zinc-200 dark:border-zinc-700/50 shadow-sm">
                       <label className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                         <Sparkles className="w-4 h-4" />
-                        Creativity Level
+                        {t(language, 'creativityLevel')}
                       </label>
                       <div className="grid grid-cols-3 gap-2">
                         {(['low', 'medium', 'high'] as const).map((level) => (
@@ -269,31 +262,30 @@ export function SettingsModal({
                             className={cn(
                               "px-3 py-3 rounded-xl text-sm font-medium capitalize transition-all border",
                               creativityLevel === level
-                                ? "bg-[var(--accent-color)] text-white border-[var(--accent-color)] shadow-sm"
-                                : "bg-[var(--bg-input)] text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)]"
+                                ? "bg-white dark:bg-zinc-700 text-[var(--text-primary)] border-zinc-300 dark:border-zinc-600 shadow-sm"
+                                : "bg-transparent text-[var(--text-secondary)] border-[var(--border-color)] hover:bg-zinc-100 dark:hover:bg-zinc-800/50 hover:text-[var(--text-primary)]"
                             )}
                           >
-                            {level}
+                            {t(language, level)}
                           </button>
                         ))}
                       </div>
+                      <p className="text-xs text-[var(--text-muted)] mt-2">Adjusts the AI's temperature. Higher means more creative, lower means more deterministic.</p>
                     </div>
 
-                    <div className="h-px bg-[var(--border-color)] my-6" />
-
                     {/* Danger Zone */}
-                    <div className="space-y-4">
-                      <label className="text-sm font-medium text-red-400 flex items-center gap-2">
-                        Danger Zone
+                    <div className="space-y-4 bg-red-50 dark:bg-red-950/20 p-5 rounded-2xl border border-red-200 dark:border-red-900/30 shadow-sm">
+                      <label className="text-sm font-medium text-red-500 dark:text-red-400 flex items-center gap-2">
+                        {t(language, 'dangerZone')}
                       </label>
                       <button
                         onClick={onClearHistory}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/20 rounded-xl transition-colors text-sm font-medium"
+                        className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-red-100 dark:bg-red-500/10 hover:bg-red-200 dark:hover:bg-red-500/20 text-red-600 dark:text-red-500 border border-red-200 dark:border-red-500/20 rounded-xl transition-colors text-sm font-medium"
                       >
                         <Trash2 className="w-4 h-4" />
-                        Clear All History
+                        {t(language, 'clearAllHistory')}
                       </button>
-                      <p className="text-xs text-[var(--text-muted)] text-center">This action cannot be undone. All your chat history will be permanently deleted.</p>
+                      <p className="text-xs text-red-500/70 dark:text-[var(--text-muted)] text-center mt-2">This action cannot be undone. All your chat history will be permanently deleted.</p>
                     </div>
                   </div>
                 )}

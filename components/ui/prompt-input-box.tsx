@@ -440,6 +440,8 @@ const CustomDivider: React.FC = () => (
 );
 
 // Main PromptInputBox Component
+import { t } from '../../lib/translations';
+
 interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
   isLoading?: boolean;
@@ -447,9 +449,10 @@ interface PromptInputBoxProps {
   className?: string;
   value?: string;
   onChange?: (value: string) => void;
+  language?: string;
 }
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange, language = 'English' } = props;
   const [internalInput, setInternalInput] = React.useState("");
   const input = value !== undefined ? value : internalInput;
   const setInput = (newVal: string) => {
@@ -652,11 +655,11 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           <PromptInputTextarea
             placeholder={
               showSearch
-                ? "Search the web..."
+                ? t(language, 'search') + "..."
                 : showThink
-                ? "Think deeply..."
+                ? t(language, 'think') + "..."
                 : showCanvas
-                ? "Create on canvas..."
+                ? t(language, 'canvas') + "..."
                 : placeholder
             }
             className="text-base"
@@ -706,8 +709,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                     className={cn(
                       "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
                       showSearch
-                        ? "bg-[#1EAEDB]/15 border-[#1EAEDB] text-[#1EAEDB]"
-                        : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
+                        ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
+                        : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     )}
                   >
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -716,7 +719,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                         whileHover={{ rotate: showSearch ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
                         transition={{ type: "spring", stiffness: 260, damping: 25 }}
                       >
-                        <Globe className={cn("w-4 h-4", showSearch ? "text-[#1EAEDB]" : "text-inherit")} />
+                        <Globe className={cn("w-4 h-4", showSearch ? "text-[var(--text-primary)]" : "text-inherit")} />
                       </motion.div>
                     </div>
                     <AnimatePresence>
@@ -726,9 +729,9 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                           animate={{ width: "auto", opacity: 1 }}
                           exit={{ width: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
-                          className="text-xs overflow-hidden whitespace-nowrap text-[#1EAEDB] flex-shrink-0"
+                          className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                         >
-                          Search
+                          {t(language, 'search')}
                         </motion.span>
                       )}
                     </AnimatePresence>
@@ -742,8 +745,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                     className={cn(
                       "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
                       showThink
-                        ? "bg-[#8B5CF6]/15 border-[#8B5CF6] text-[#8B5CF6]"
-                        : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
+                        ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
+                        : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     )}
                   >
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -752,7 +755,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                         whileHover={{ rotate: showThink ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
                         transition={{ type: "spring", stiffness: 260, damping: 25 }}
                       >
-                        <BrainCog className={cn("w-4 h-4", showThink ? "text-[#8B5CF6]" : "text-inherit")} />
+                        <BrainCog className={cn("w-4 h-4", showThink ? "text-[var(--text-primary)]" : "text-inherit")} />
                       </motion.div>
                     </div>
                     <AnimatePresence>
@@ -762,9 +765,9 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                           animate={{ width: "auto", opacity: 1 }}
                           exit={{ width: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
-                          className="text-xs overflow-hidden whitespace-nowrap text-[#8B5CF6] flex-shrink-0"
+                          className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                         >
-                          Think
+                          {t(language, 'think')}
                         </motion.span>
                       )}
                     </AnimatePresence>
@@ -778,8 +781,8 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                     className={cn(
                       "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
                       showCanvas
-                        ? "bg-[#F97316]/15 border-[#F97316] text-[#F97316]"
-                        : "bg-transparent border-transparent text-[#9CA3AF] hover:text-[#D1D5DB]"
+                        ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
+                        : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                     )}
                   >
                     <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -788,7 +791,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                         whileHover={{ rotate: showCanvas ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
                         transition={{ type: "spring", stiffness: 260, damping: 25 }}
                       >
-                        <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[#F97316]" : "text-inherit")} />
+                        <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[var(--text-primary)]" : "text-inherit")} />
                       </motion.div>
                     </div>
                     <AnimatePresence>
@@ -798,9 +801,9 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                           animate={{ width: "auto", opacity: 1 }}
                           exit={{ width: 0, opacity: 0 }}
                           transition={{ duration: 0.2 }}
-                          className="text-xs overflow-hidden whitespace-nowrap text-[#F97316] flex-shrink-0"
+                          className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                         >
-                          Canvas
+                          {t(language, 'canvas')}
                         </motion.span>
                       )}
                     </AnimatePresence>

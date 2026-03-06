@@ -4,6 +4,7 @@ import { AppleStyleDock } from './components/ui/apple-style-dock';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
 import { streamChat, generateTitle, generateSuggestions } from './lib/gemini';
+import { t } from './lib/translations';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, HelpCircle, Download, Code, Zap, BarChart, Bug, Languages } from 'lucide-react';
 import { ThemeToggle } from './components/ui/theme-toggle';
@@ -15,7 +16,6 @@ import { SettingsModal } from './components/ui/settings-modal';
 import { CodeRunner } from './components/ui/code-runner';
 import { SiriOrb } from './components/SiriOrb';
 import { cn } from './lib/utils';
-import { DEFAULT_SYSTEM_INSTRUCTION } from './lib/constants';
 
 interface Message {
   role: 'user' | 'model';
@@ -127,7 +127,7 @@ export default function App() {
   const [aiMood, setAiMood] = useState('Neutral');
   const [responseLength, setResponseLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [creativityLevel, setCreativityLevel] = useState<'low' | 'medium' | 'high'>('medium');
-  const [accentColor, setAccentColor] = useState<'blue' | 'purple' | 'green' | 'orange'>('blue');
+  const [fontSize, setFontSize] = useState<'small' | 'base' | 'large'>('base');
   const [currentSuggestions, setCurrentSuggestions] = useState<Suggestion[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, language: string}>({ isOpen: false, code: '', language: '' });
@@ -163,18 +163,6 @@ export default function App() {
   const editInputRef = useRef<HTMLInputElement>(null);
   const mainContentRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUp = useRef(false);
-
-  // Apply accent color
-  useEffect(() => {
-    const root = document.documentElement;
-    const colorMap = {
-      blue: '#3b82f6',
-      purple: '#a855f7',
-      green: '#10b981',
-      orange: '#f97316'
-    };
-    root.style.setProperty('--accent-color', colorMap[accentColor]);
-  }, [accentColor]);
 
   // Listen for custom run-code and set-prompt events
   useEffect(() => {
@@ -391,7 +379,7 @@ export default function App() {
       
       let fullResponse = '';
       const customPersona = `You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
-      const stream = streamChat(newMessages, value, customPersona);
+      const stream = streamChat(newMessages, value, customPersona, false, creativityLevel);
       
       for await (const chunk of stream) {
         fullResponse += chunk;
@@ -428,7 +416,7 @@ export default function App() {
     
     try {
       const customPersona = `You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
-      const stream = streamChat(historyUpToNow, previousUserMessage.content, customPersona, true);
+      const stream = streamChat(historyUpToNow, previousUserMessage.content, customPersona, true, creativityLevel);
       
       for await (const chunk of stream) {
         accumulatedResponse += chunk;
@@ -589,7 +577,7 @@ export default function App() {
             className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors group text-sm text-[var(--text-primary)] h-10 outline-none focus:outline-none"
           >
             <Plus className="w-4 h-4" />
-            <span>New chat</span>
+            <span>{t(language, 'newChat')}</span>
           </motion.button>
 
           <motion.div variants={itemVariants} className="relative h-10">
@@ -615,14 +603,14 @@ export default function App() {
                 className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)] h-full"
               >
                 <Search className="w-4 h-4" />
-                <span>Search chats</span>
+                <span>{t(language, 'searchChats')}</span>
               </button>
             )}
           </motion.div>
         </div>
 
         <div className="flex-1 overflow-y-auto py-2 px-3">
-          <motion.div variants={itemVariants} className="text-xs font-medium text-[var(--text-muted)] px-3 mb-2 mt-4">Your chats</motion.div>
+          <motion.div variants={itemVariants} className="text-xs font-medium text-[var(--text-muted)] px-3 mb-2 mt-4">{t(language, 'history')}</motion.div>
           <motion.div variants={itemVariants}>
           <AnimatePresence initial={false}>
             {filteredHistory.length === 0 ? (
@@ -633,7 +621,7 @@ export default function App() {
                 exit={{ opacity: 0, height: 0 }}
                 className="px-3 py-4 text-center text-xs text-[var(--text-muted)] italic overflow-hidden"
               >
-                {searchQuery ? "No chats found" : "No chat history"}
+                {searchQuery ? t(language, 'noChats') : t(language, 'noChats')}
               </motion.div>
             ) : (
               filteredHistory.map((session) => (
@@ -716,7 +704,7 @@ export default function App() {
             className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <Settings className="w-4 h-4" />
-            <span>Settings</span>
+            <span>{t(language, 'settings')}</span>
           </button>
           <button 
             onClick={() => {
@@ -771,7 +759,7 @@ export default function App() {
                     </motion.div>
 
                     <GradualSpacing 
-                       text="What can I help with?"
+                       text={t(language, 'whatCanIHelpWith')}
                        className="text-4xl md:text-5xl font-medium text-[var(--text-primary)] tracking-tight text-center opacity-90 mb-2"
                        delayMultiple={0.04}
                        baseDelay={0.2}
@@ -784,12 +772,12 @@ export default function App() {
                       className="w-full pointer-events-auto"
                     >
                       <PromptInputBox
-                        placeholder="Ask anything..."
+                        placeholder={t(language, 'whatCanIHelpWith')}
                         onSend={(msg) => handleSubmit(msg)}
                         isLoading={isLoading}
                         value={inputValue}
                         onChange={setInputValue}
-                        inputStyle={inputStyle}
+                        language={language}
                       />
                     </motion.div>
                     
@@ -901,12 +889,12 @@ export default function App() {
         >
           <motion.div className="w-full max-w-3xl pointer-events-auto">
             <PromptInputBox
-              placeholder="Ask anything..."
+              placeholder={t(language, 'typeMessage')}
               onSend={(msg) => handleSubmit(msg)}
               isLoading={isLoading}
               value={inputValue}
               onChange={setInputValue}
-              inputStyle={inputStyle}
+              language={language}
             />
           </motion.div>
         </motion.div>
@@ -915,14 +903,14 @@ export default function App() {
       {/* Dock Hover Trigger & Indicator */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (hasStarted || currentView !== 'chat') && (
         <div 
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-64 h-6 z-[200] flex items-end justify-center pb-1 cursor-pointer group"
+          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-96 h-12 z-[200] flex items-end justify-center pb-2 cursor-pointer group"
           onMouseEnter={() => setIsDockHovered(true)}
           onMouseLeave={() => setIsDockHovered(false)}
         >
           {/* Subtle Indicator Line */}
           <div className={cn(
-            "w-16 h-1 rounded-full transition-all duration-300",
-            isDockHovered ? "bg-transparent" : "bg-[var(--text-muted)]/30 group-hover:bg-[var(--text-secondary)]/50 group-hover:w-24"
+            "w-20 h-1.5 rounded-full transition-all duration-300",
+            isDockHovered ? "bg-transparent" : "bg-[var(--text-muted)]/40 group-hover:bg-[var(--text-secondary)]/60 group-hover:w-32"
           )} />
         </div>
       )}
@@ -930,7 +918,7 @@ export default function App() {
       {/* Dock */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (
         <div 
-          className="fixed bottom-4 left-0 w-full z-[200] pointer-events-none flex justify-center"
+          className="fixed bottom-8 left-0 w-full z-[200] pointer-events-none flex justify-center"
         >
           <div className="pointer-events-auto" onMouseEnter={() => setIsDockHovered(true)} onMouseLeave={() => setIsDockHovered(false)}>
              <AppleStyleDock 
@@ -975,8 +963,8 @@ export default function App() {
         setResponseLength={setResponseLength}
         creativityLevel={creativityLevel}
         setCreativityLevel={setCreativityLevel}
-        accentColor={accentColor}
-        setAccentColor={setAccentColor}
+        fontSize={fontSize}
+        setFontSize={setFontSize}
         isDark={isDark}
         setIsDark={setIsDark}
       />

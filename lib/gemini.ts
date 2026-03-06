@@ -115,7 +115,8 @@ export async function* streamChat(
   history: { role: 'user' | 'model'; content: string }[],
   newMessage: string,
   customPersona?: string,
-  isRegeneration: boolean = false
+  isRegeneration: boolean = false,
+  creativityLevel: 'low' | 'medium' | 'high' = 'medium'
 ) {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -137,10 +138,17 @@ export async function* streamChat(
     return true;
   });
 
+  const temperatureMap = {
+    low: 0.2,
+    medium: 0.7,
+    high: 1.2
+  };
+
   const chat = ai.chats.create({
     model: 'gemini-3-flash-preview',
     config: {
       systemInstruction: finalSystemInstruction,
+      temperature: temperatureMap[creativityLevel],
     },
     history: historyForModel.map(msg => ({
       role: msg.role,
