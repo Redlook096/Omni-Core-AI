@@ -373,7 +373,11 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    const sendWithEnter = localStorage.getItem('sendWithEnter') !== 'false';
+    if (e.key === "Enter" && !e.shiftKey && sendWithEnter) {
+      e.preventDefault();
+      onSubmit?.();
+    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !sendWithEnter) {
       e.preventDefault();
       onSubmit?.();
     }
@@ -554,24 +558,11 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       else if (showThink) messagePrefix = "[Think: ";
       else if (showCanvas) messagePrefix = "[Canvas: ";
       else {
-        setIsDetecting(true);
-        try {
-          // Auto-detect code requests using AI
-          const isCodeRequest = await detectCodeIntent(input);
-          if (isCodeRequest) {
-            messagePrefix = "[Canvas: ";
-            autoCanvas = true;
-          }
-        } catch (e) {
-          console.error("Error detecting code intent:", e);
-          // Fallback to regex
-          const isCodeRequest = /\b(code|script|function|app|component|html|css|javascript|python|react|vue|angular|node|express|api|endpoint|database|sql|build|create|make)\b/i.test(input);
-          if (isCodeRequest) {
-            messagePrefix = "[Canvas: ";
-            autoCanvas = true;
-          }
-        } finally {
-          setIsDetecting(false);
+        // Use fast regex detection instead of slow AI call to prevent UI freezing
+        const isCodeRequest = /\b(code|script|function|app|component|html|css|javascript|python|react|vue|angular|node|express|api|endpoint|database|sql|build|create|make)\b/i.test(input);
+        if (isCodeRequest) {
+          messagePrefix = "[Canvas: ";
+          autoCanvas = true;
         }
       }
       

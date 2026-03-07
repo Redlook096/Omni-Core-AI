@@ -4,7 +4,9 @@ import {
   Copy, 
   RotateCw, 
   Check,
-  Search
+  Search,
+  BrainCog,
+  FolderCode
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -19,6 +21,9 @@ export interface ChatMessageProps {
   isStreaming?: boolean;
   typingSpeed?: 'slow' | 'normal' | 'fast';
   isSearching?: boolean;
+  isThinking?: boolean;
+  isCanvas?: boolean;
+  messageStyle?: 'modern' | 'classic';
 }
 
 const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' | 'normal' | 'fast' = 'normal') => {
@@ -271,7 +276,7 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
   );
 });
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, typingSpeed = 'normal' }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, isThinking, isCanvas, typingSpeed = 'normal', messageStyle = 'modern' }) => {
   const isUser = role === 'user';
   const [isCopied, setIsCopied] = useState(false);
 
@@ -341,6 +346,28 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
                    </motion.div>
                    <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Searching...</TextShimmer>
                  </>
+               ) : isThinking ? (
+                 <>
+                   <motion.div
+                     animate={{ scale: [0.9, 1.1, 0.9], rotate: [0, 360] }}
+                     transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                     className="flex items-center justify-center w-4 h-4"
+                   >
+                     <BrainCog className="w-4 h-4 text-purple-400" />
+                   </motion.div>
+                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Thinking deeply...</TextShimmer>
+                 </>
+               ) : isCanvas ? (
+                 <>
+                   <motion.div
+                     animate={{ scale: [0.9, 1.1, 0.9], y: [-2, 2, -2] }}
+                     transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+                     className="flex items-center justify-center w-4 h-4"
+                   >
+                     <FolderCode className="w-4 h-4 text-orange-400" />
+                   </motion.div>
+                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Creating canvas...</TextShimmer>
+                 </>
                ) : (
                  <>
                    <MorphingSquare className="w-3 h-3 md:w-4 md:h-4" />
@@ -361,8 +388,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               className={cn(
                 "text-[15px] leading-7 md:text-[16px] relative transition-all duration-300",
                 isUser 
-                  ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85vw] md:max-w-[600px]" 
-                  : "text-[var(--text-primary)] px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
+                  ? (messageStyle === 'modern' 
+                      ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85vw] md:max-w-[600px]"
+                      : "bg-[var(--accent-color)] text-white px-5 py-3 rounded-[20px] rounded-br-[4px] shadow-sm max-w-[85vw] md:max-w-[600px]")
+                  : (messageStyle === 'modern'
+                      ? "text-[var(--text-primary)] px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
+                      : "bg-[var(--bg-card)] text-[var(--text-primary)] px-5 py-4 rounded-[20px] rounded-bl-[4px] shadow-sm max-w-[85vw] md:max-w-[800px] border border-[var(--border-color)]")
               )}
             >
               {isUser ? displayContent : <FormatText text={displayedContent} isStreaming={isStreaming} />}

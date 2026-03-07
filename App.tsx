@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PromptInputBox } from './components/ui/prompt-input-box';
-import { AppleStyleDock } from './components/ui/apple-style-dock';
+import { Dock } from './components/ui/dock';
+import { Home, Video, Square } from 'lucide-react';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
 import { streamChat, generateTitle, generateSuggestions } from './lib/gemini';
@@ -128,6 +129,19 @@ export default function App() {
   const [responseLength, setResponseLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [creativityLevel, setCreativityLevel] = useState<'low' | 'medium' | 'high'>('medium');
   const [fontSize, setFontSize] = useState<'small' | 'base' | 'large'>('base');
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
+  const [aiName, setAiName] = useState(() => {
+    return localStorage.getItem('aiName') || 'Gemini';
+  });
+  const [aiMemory, setAiMemory] = useState(() => {
+    return localStorage.getItem('aiMemory') || '';
+  });
+  const [messageStyle, setMessageStyle] = useState<'modern' | 'classic'>(() => {
+    return (localStorage.getItem('messageStyle') as 'modern' | 'classic') || 'modern';
+  });
+  const [sendWithEnter, setSendWithEnter] = useState(() => {
+    return localStorage.getItem('sendWithEnter') !== 'false';
+  });
   const [currentSuggestions, setCurrentSuggestions] = useState<Suggestion[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, language: string}>({ isOpen: false, code: '', language: '' });
@@ -229,6 +243,18 @@ export default function App() {
   }, [hasStarted, history]);
 
   useEffect(() => {
+    localStorage.setItem('aiName', aiName);
+  }, [aiName]);
+
+  useEffect(() => {
+    localStorage.setItem('aiMemory', aiMemory);
+  }, [aiMemory]);
+
+  useEffect(() => {
+    localStorage.setItem('fontFamily', fontFamily);
+  }, [fontFamily]);
+
+  useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener('resize', checkMobile);
@@ -240,13 +266,35 @@ export default function App() {
   };
 
   useEffect(() => {
-    // Keep this for initial load or if skipped
     if (isDark) {
+      document.documentElement.classList.add('dark');
       document.documentElement.classList.remove('light');
     } else {
       document.documentElement.classList.add('light');
+      document.documentElement.classList.remove('dark');
     }
   }, [isDark]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    if (fontSize === 'small') html.style.fontSize = '14px';
+    else if (fontSize === 'large') html.style.fontSize = '18px';
+    else html.style.fontSize = '16px';
+  }, [fontSize]);
+
+  useEffect(() => {
+    const html = document.documentElement;
+    html.classList.remove('font-sans', 'font-serif', 'font-mono');
+    html.classList.add(`font-${fontFamily}`);
+  }, [fontFamily]);
+
+  useEffect(() => {
+    localStorage.setItem('sendWithEnter', sendWithEnter.toString());
+  }, [sendWithEnter]);
+
+  useEffect(() => {
+    localStorage.setItem('messageStyle', messageStyle);
+  }, [messageStyle]);
 
   const handleScroll = () => {
     if (!mainContentRef.current) return;
@@ -378,7 +426,7 @@ export default function App() {
       setMessages(prev => [...prev, { role: 'model', content: '' }]);
       
       let fullResponse = '';
-      const customPersona = `You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const customPersona = `Your name is ${aiName}. ${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
       const stream = streamChat(newMessages, value, customPersona, false, creativityLevel);
       
       for await (const chunk of stream) {
@@ -415,7 +463,7 @@ export default function App() {
     let accumulatedResponse = '';
     
     try {
-      const customPersona = `You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const customPersona = `Your name is ${aiName}. ${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
       const stream = streamChat(historyUpToNow, previousUserMessage.content, customPersona, true, creativityLevel);
       
       for await (const chunk of stream) {
@@ -502,18 +550,9 @@ export default function App() {
     session.messages.some(msg => msg.content.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const getFontSizeClass = () => {
-    switch (fontSize) {
-      case 'small': return 'text-sm';
-      case 'large': return 'text-lg';
-      default: return 'text-base';
-    }
-  };
-
   return (
     <div className={cn(
-      "h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col items-center relative font-sans transition-colors duration-300 overflow-hidden",
-      getFontSizeClass()
+      "h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] flex flex-col items-center relative font-sans transition-colors duration-300 overflow-hidden"
     )}>
       
       {/* Global Sidebar Toggle Button */}
@@ -755,11 +794,24 @@ export default function App() {
                       transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
                       className="relative flex items-center justify-center mb-10 mt-4"
                     >
-                      <SiriOrb size="112px" />
+                      <SiriOrb 
+                        size="112px" 
+                        colors={isDark ? {
+                          bg: "transparent",
+                          c1: "#ffffff",
+                          c2: "#ffffff",
+                          c3: "#f8f9fa",
+                        } : {
+                          bg: "transparent",
+                          c1: "#000000",
+                          c2: "#333333",
+                          c3: "#666666",
+                        }}
+                      />
                     </motion.div>
 
                     <GradualSpacing 
-                       text={t(language, 'whatCanIHelpWith')}
+                       text={`Hi, I'm ${aiName}. ${t(language, 'whatCanIHelpWith')}`}
                        className="text-4xl md:text-5xl font-medium text-[var(--text-primary)] tracking-tight text-center opacity-90 mb-2"
                        delayMultiple={0.04}
                        baseDelay={0.2}
@@ -843,6 +895,8 @@ export default function App() {
                   >
                     {messages.map((msg, idx) => {
                       const isSearching = idx > 0 && messages[idx - 1].role === 'user' && messages[idx - 1].content.startsWith('[Search: ');
+                      const isThinking = idx > 0 && messages[idx - 1].role === 'user' && messages[idx - 1].content.startsWith('[Think: ');
+                      const isCanvas = idx > 0 && messages[idx - 1].role === 'user' && messages[idx - 1].content.startsWith('[Canvas: ');
                       return (
                         <ChatMessage 
                           key={idx} 
@@ -851,6 +905,9 @@ export default function App() {
                           onRegenerate={() => handleRegenerate(idx)}
                           isStreaming={isLoading && idx === messages.length - 1 && msg.role === 'model'}
                           isSearching={isSearching}
+                          isThinking={isThinking}
+                          isCanvas={isCanvas}
+                          messageStyle={messageStyle}
                         />
                       );
                     })}
@@ -879,10 +936,10 @@ export default function App() {
         <motion.div 
           initial={false}
           animate={{ 
-            pointerEvents: (hasStarted && isDockHovered) ? 'none' : 'auto',
+            pointerEvents: 'auto',
             paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px",
-            opacity: (hasStarted && isDockHovered) ? 0 : 1,
-            y: (hasStarted && isDockHovered) ? 20 : 0
+            opacity: 1,
+            y: 0
           }}
           transition={SIDEBAR_TRANSITION}
           className="fixed bottom-10 left-0 right-0 z-30 flex justify-center pointer-events-none px-4"
@@ -903,7 +960,7 @@ export default function App() {
       {/* Dock Hover Trigger & Indicator */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (hasStarted || currentView !== 'chat') && (
         <div 
-          className="fixed bottom-0 left-1/2 -translate-x-1/2 w-96 h-12 z-[200] flex items-end justify-center pb-2 cursor-pointer group"
+          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-16 z-[200] flex items-start justify-center pt-2 cursor-pointer group"
           onMouseEnter={() => setIsDockHovered(true)}
           onMouseLeave={() => setIsDockHovered(false)}
         >
@@ -918,17 +975,32 @@ export default function App() {
       {/* Dock */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (
         <div 
-          className="fixed bottom-8 left-0 w-full z-[200] pointer-events-none flex justify-center"
+          className="fixed top-4 left-0 w-full z-[200] pointer-events-none flex justify-center"
         >
           <div className="pointer-events-auto" onMouseEnter={() => setIsDockHovered(true)} onMouseLeave={() => setIsDockHovered(false)}>
-             <AppleStyleDock 
-               show={currentView === 'chat' ? (!hasStarted || isDockHovered) : isDockHovered} 
-               onHomeClick={() => {
-                 setCurrentView('chat');
-                 handleHomeClick();
-               }}
-               onStoryClick={() => setCurrentView('creators-menu')}
-             />
+            <AnimatePresence>
+              {(currentView === 'chat' ? (!hasStarted || isDockHovered) : isDockHovered) && (
+                <motion.div
+                  initial={{ y: -50, opacity: 0, scale: 0.95 }}
+                  animate={{ y: 0, opacity: 1, scale: 1 }}
+                  exit={{ y: -50, opacity: 0, scale: 0.95 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 30 }}
+                >
+                  <Dock 
+                    items={[
+                      {
+                        label: 'Home',
+                        icon: Home,
+                        onClick: () => {
+                          setCurrentView('chat');
+                          handleHomeClick();
+                        }
+                      }
+                    ]}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       )}
@@ -967,6 +1039,16 @@ export default function App() {
         setFontSize={setFontSize}
         isDark={isDark}
         setIsDark={setIsDark}
+        sendWithEnter={sendWithEnter}
+        setSendWithEnter={setSendWithEnter}
+        messageStyle={messageStyle}
+        setMessageStyle={setMessageStyle}
+        aiName={aiName}
+        setAiName={setAiName}
+        aiMemory={aiMemory}
+        setAiMemory={setAiMemory}
+        fontFamily={fontFamily}
+        setFontFamily={setFontFamily}
       />
 
       <CodeRunner 
