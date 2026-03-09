@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PromptInputBox } from './components/ui/prompt-input-box';
-import { Dock } from './components/ui/dock';
-import { Home, Video, Square } from 'lucide-react';
+import { Dock, DockIcon, DockItem, DockLabel } from './components/ui/dock';
+import { Home, BookOpen, ChevronDown } from 'lucide-react';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
 import { streamChat, generateTitle, generateSuggestions } from './lib/gemini';
 import { t } from './lib/translations';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, HelpCircle, Download, Code, Zap, BarChart, Bug, Languages } from 'lucide-react';
+import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Download, Code, Zap, BarChart, Bug, Languages } from 'lucide-react';
 import { ThemeToggle } from './components/ui/theme-toggle';
 import { FakeTextStory } from './components/ui/fake-text-story';
 import { CreatorsMenu } from './components/ui/creators-menu';
@@ -135,9 +135,6 @@ export default function App() {
   });
   const [aiMemory, setAiMemory] = useState(() => {
     return localStorage.getItem('aiMemory') || '';
-  });
-  const [messageStyle, setMessageStyle] = useState<'modern' | 'classic'>(() => {
-    return (localStorage.getItem('messageStyle') as 'modern' | 'classic') || 'modern';
   });
   const [sendWithEnter, setSendWithEnter] = useState(() => {
     return localStorage.getItem('sendWithEnter') !== 'false';
@@ -291,10 +288,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('sendWithEnter', sendWithEnter.toString());
   }, [sendWithEnter]);
-
-  useEffect(() => {
-    localStorage.setItem('messageStyle', messageStyle);
-  }, [messageStyle]);
 
   const handleScroll = () => {
     if (!mainContentRef.current) return;
@@ -597,7 +590,7 @@ export default function App() {
         initial="closed"
         animate={isSidebarOpen ? "open" : "closed"}
         variants={sidebarVariants}
-        className="fixed top-0 left-0 bottom-0 w-[260px] bg-[var(--bg-sidebar)] z-[70] flex flex-col border-r border-[var(--border-color)] transition-colors duration-500"
+        className="fixed top-0 left-0 bottom-0 w-[260px] bg-[var(--bg-sidebar)] z-[70] flex flex-col border-r border-[var(--border-color)] transition-colors duration-300"
       >
         <div className="p-3 space-y-2">
           {/* Sidebar Header with Close Button */}
@@ -745,16 +738,6 @@ export default function App() {
             <Settings className="w-4 h-4" />
             <span>{t(language, 'settings')}</span>
           </button>
-          <button 
-            onClick={() => {
-              // Placeholder for help/FAQ
-              alert("Help & FAQ coming soon!");
-            }}
-            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-          >
-            <HelpCircle className="w-4 h-4" />
-            <span>Help & FAQ</span>
-          </button>
           <ThemeToggle isDark={isDark} toggleTheme={toggleTheme} />
         </motion.div>
       </motion.div>
@@ -811,7 +794,7 @@ export default function App() {
                     </motion.div>
 
                     <GradualSpacing 
-                       text={`Hi, I'm ${aiName}. ${t(language, 'whatCanIHelpWith')}`}
+                       text={t(language, 'whatCanIHelpWith')}
                        className="text-4xl md:text-5xl font-medium text-[var(--text-primary)] tracking-tight text-center opacity-90 mb-2"
                        delayMultiple={0.04}
                        baseDelay={0.2}
@@ -863,15 +846,16 @@ export default function App() {
                                 }
                               }
                             }}
-                            className="flex flex-col items-start p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)]/50 hover:bg-[var(--bg-hover)] transition-all text-left group shadow-sm"
+                            className="flex flex-col items-start p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all duration-300 text-left group shadow-sm hover:shadow-md hover:-translate-y-1 relative overflow-hidden"
                           >
-                            <div className="flex items-center gap-2 text-[var(--text-primary)] font-medium text-sm mb-1">
-                              <span className="text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors">
+                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                            <div className="flex items-center gap-2 text-[var(--text-primary)] font-medium text-sm mb-1 relative z-10">
+                              <span className="text-[var(--text-secondary)] group-hover:text-indigo-500 transition-colors duration-300">
                                 {IconComponent && <IconComponent className="w-4 h-4" />}
                               </span>
                               {suggestion.text}
                             </div>
-                            <div className="text-xs text-[var(--text-muted)]">
+                            <div className="text-xs text-[var(--text-muted)] relative z-10">
                               {suggestion.subtext}
                             </div>
                           </motion.button>
@@ -907,7 +891,6 @@ export default function App() {
                           isSearching={isSearching}
                           isThinking={isThinking}
                           isCanvas={isCanvas}
-                          messageStyle={messageStyle}
                         />
                       );
                     })}
@@ -936,15 +919,23 @@ export default function App() {
         <motion.div 
           initial={false}
           animate={{ 
-            pointerEvents: 'auto',
+            pointerEvents: isDockHovered ? 'none' : 'auto',
             paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px",
-            opacity: 1,
-            y: 0
+            opacity: isDockHovered ? 0 : 1
           }}
           transition={SIDEBAR_TRANSITION}
-          className="fixed bottom-10 left-0 right-0 z-30 flex justify-center pointer-events-none px-4"
+          className="fixed bottom-0 left-0 right-0 z-30 flex justify-center pointer-events-none px-4 pb-10 pt-16 bg-gradient-to-t from-[var(--bg-app)] via-[var(--bg-app)]/80 to-transparent"
         >
-          <motion.div className="w-full max-w-3xl pointer-events-auto">
+          <motion.div 
+            className="w-full max-w-3xl pointer-events-auto origin-bottom"
+            animate={{
+              scaleX: isDockHovered ? 0.3 : 1,
+              scaleY: isDockHovered ? 0.3 : 1,
+              opacity: isDockHovered ? 0 : 1,
+              y: isDockHovered ? 20 : 0
+            }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          >
             <PromptInputBox
               placeholder={t(language, 'typeMessage')}
               onSend={(msg) => handleSubmit(msg)}
@@ -957,47 +948,85 @@ export default function App() {
         </motion.div>
       )}
 
-      {/* Dock Hover Trigger & Indicator */}
-      {!isStoryFullscreen && currentView !== 'creators-menu' && (hasStarted || currentView !== 'chat') && (
-        <div 
-          className="fixed top-0 left-1/2 -translate-x-1/2 w-full max-w-2xl h-16 z-[200] flex items-start justify-center pt-2 cursor-pointer group"
-          onMouseEnter={() => setIsDockHovered(true)}
-          onMouseLeave={() => setIsDockHovered(false)}
-        >
-          {/* Subtle Indicator Line */}
-          <div className={cn(
-            "w-20 h-1.5 rounded-full transition-all duration-300",
-            isDockHovered ? "bg-transparent" : "bg-[var(--text-muted)]/40 group-hover:bg-[var(--text-secondary)]/60 group-hover:w-32"
-          )} />
-        </div>
-      )}
-
-      {/* Dock */}
+      {/* Dock & Indicator */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (
         <div 
-          className="fixed top-4 left-0 w-full z-[200] pointer-events-none flex justify-center"
+          className="fixed bottom-0 left-0 w-full h-10 z-[200] pointer-events-none flex flex-col justify-end items-center pb-0"
         >
-          <div className="pointer-events-auto" onMouseEnter={() => setIsDockHovered(true)} onMouseLeave={() => setIsDockHovered(false)}>
+          <div 
+            className="pointer-events-auto relative flex flex-col items-center justify-end w-full max-w-2xl h-full group"
+            onMouseEnter={() => setIsDockHovered(true)} 
+            onMouseLeave={() => setIsDockHovered(false)}
+          >
             <AnimatePresence>
               {(currentView === 'chat' ? (!hasStarted || isDockHovered) : isDockHovered) && (
                 <motion.div
-                  initial={{ y: -50, opacity: 0, scale: 0.95 }}
+                  className="absolute bottom-6"
+                  initial={{ y: 50, opacity: 0, scale: 0.95 }}
                   animate={{ y: 0, opacity: 1, scale: 1 }}
-                  exit={{ y: -50, opacity: 0, scale: 0.95 }}
+                  exit={{ y: 50, opacity: 0, scale: 0.95 }}
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 >
-                  <Dock 
-                    items={[
-                      {
-                        label: 'Home',
-                        icon: Home,
-                        onClick: () => {
-                          setCurrentView('chat');
-                          handleHomeClick();
-                        }
-                      }
-                    ]}
-                  />
+                  <Dock className='items-end pb-3'>
+                    <DockItem
+                      onClick={() => {
+                        setCurrentView('chat');
+                        handleHomeClick();
+                      }}
+                      className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
+                    >
+                      <DockLabel>Home</DockLabel>
+                      <DockIcon><Home className='h-full w-full' /></DockIcon>
+                    </DockItem>
+                    <DockItem
+                      onClick={() => {
+                        setCurrentView('chat');
+                      }}
+                      className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
+                    >
+                      <DockLabel>Chat</DockLabel>
+                      <DockIcon><MessageSquare className='h-full w-full' /></DockIcon>
+                    </DockItem>
+                    <DockItem
+                      onClick={() => {
+                        setCurrentView('story');
+                      }}
+                      className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
+                    >
+                      <DockLabel>Story</DockLabel>
+                      <DockIcon><BookOpen className='h-full w-full' /></DockIcon>
+                    </DockItem>
+                    <DockItem
+                      onClick={() => {
+                        setIsSettingsOpen(true);
+                      }}
+                      className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
+                    >
+                      <DockLabel>Settings</DockLabel>
+                      <DockIcon><Settings className='h-full w-full' /></DockIcon>
+                    </DockItem>
+                  </Dock>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* Animated Dock Indicator */}
+            <AnimatePresence>
+              {(hasStarted || currentView !== 'chat') && !isDockHovered && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute bottom-4 flex flex-col items-center justify-center cursor-pointer"
+                >
+                  <motion.div
+                    animate={{ y: [0, -5, 0] }}
+                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
+                    className="flex items-center gap-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] px-3 py-1.5 rounded-full shadow-md"
+                  >
+                    <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-widest">Menu</span>
+                    <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />
+                  </motion.div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1041,8 +1070,6 @@ export default function App() {
         setIsDark={setIsDark}
         sendWithEnter={sendWithEnter}
         setSendWithEnter={setSendWithEnter}
-        messageStyle={messageStyle}
-        setMessageStyle={setMessageStyle}
         aiName={aiName}
         setAiName={setAiName}
         aiMemory={aiMemory}

@@ -210,7 +210,7 @@ export function AIInput({
               "text-[var(--text-primary)] text-wrap",
               "overflow-y-auto resize-none",
               "focus-visible:ring-0 focus-visible:ring-offset-0",
-              "transition-all duration-200 ease-out", 
+              "transition-all duration-300 ease-out", 
               "leading-relaxed py-[10px]", 
               "text-lg",
               `min-h-[${minHeight}px]`,
@@ -276,7 +276,7 @@ export function AIInput({
 
           <div
             className={cn(
-              "absolute top-1/2 -translate-y-1/2 rounded-xl py-2 px-2 transition-all duration-200 ease-out",
+              "absolute top-1/2 -translate-y-1/2 rounded-xl py-2 px-2 transition-all duration-300 ease-out",
               inputValue ? "right-16" : "right-6"
             )}
           >
@@ -289,7 +289,7 @@ export function AIInput({
             className={cn(
               "absolute top-1/2 -translate-y-1/2 right-6",
               "rounded-xl bg-[var(--bg-hover)] py-2 px-2",
-              "transition-all duration-200 ease-out",
+              "transition-all duration-300 ease-out",
               inputValue
                 ? "opacity-100 scale-100"
                 : "opacity-0 scale-95 pointer-events-none"

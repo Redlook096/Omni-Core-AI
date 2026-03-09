@@ -16,7 +16,8 @@
   --shadow-color: rgba(0, 0, 0, 0.5);
   --bg-user-message: #27272a;
   --text-user-message: #ffffff;
-  --accent-color: #3b82f6; /* Default blue */
+  --accent-color: #ffffff; /* White in dark mode */
+  --bg-dock: rgba(26, 26, 26, 0.6);
 }
 
 /* Light Mode Override */
@@ -34,6 +35,8 @@
   --shadow-color: rgba(0, 0, 0, 0.1);
   --bg-user-message: #171717; /* neutral-900 */
   --text-user-message: #ffffff;
+  --accent-color: #000000; /* Black in light mode */
+  --bg-dock: rgba(255, 255, 255, 0.6);
 }
 
 /* Custom Scrollbar */
@@ -81,13 +84,13 @@ body {
   background-color: var(--bg-app);
   color: var(--text-primary);
   font-family: 'Inter', sans-serif;
-  transition: background-color 0.5s ease, color 0.5s ease;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Global smooth fade for theme transition */
 body * {
   transition-property: background-color, border-color, color, fill, stroke, box-shadow;
-  transition-duration: 500ms;
+  transition-duration: 300ms;
   transition-timing-function: ease-in-out;
 }
 

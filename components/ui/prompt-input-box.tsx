@@ -27,7 +27,7 @@ const styles = `
   }
 `;
 
-import { detectCodeIntent } from "@/lib/gemini";
+
 
 // Inject styles into document
 if (typeof document !== 'undefined') {
@@ -342,7 +342,7 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           <div
             ref={ref}
             className={cn(
-              "rounded-3xl border border-[var(--border-color)] bg-[var(--bg-input)] p-2 shadow-sm transition-colors duration-300",
+              "rounded-3xl border border-[var(--border-color)] bg-[var(--bg-input)] p-2 shadow-sm transition-all duration-300 focus-within:ring-1 focus-within:ring-[var(--border-color)]",
               isLoading && "border-[var(--text-muted)]",
               className
             )}
@@ -470,7 +470,6 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [showSearch, setShowSearch] = React.useState(false);
   const [showThink, setShowThink] = React.useState(false);
   const [showCanvas, setShowCanvas] = React.useState(false);
-  const [isDetecting, setIsDetecting] = React.useState(false);
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
   const promptBoxRef = React.useRef<HTMLDivElement>(null);
 
@@ -594,14 +593,14 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
       <PromptInput
         value={input}
         onValueChange={setInput}
-        isLoading={isLoading || isDetecting}
+        isLoading={isLoading}
         onSubmit={handleSubmit}
         className={cn(
           "w-full transition-colors duration-300 ease-in-out",
           isRecording && "border-red-500/70",
           className
         )}
-        disabled={isLoading || isRecording || isDetecting}
+        disabled={isLoading || isRecording}
         ref={ref || promptBoxRef}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
@@ -818,11 +817,11 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
               variant="default"
               size="icon"
               className={cn(
-                "h-8 w-8 rounded-full transition-all duration-200",
+                "h-8 w-8 rounded-full transition-all duration-300",
                 isRecording
                   ? "bg-transparent hover:bg-[var(--bg-hover)] text-red-500 hover:text-red-400"
                   : hasContent
-                  ? "bg-[var(--accent-color)] hover:opacity-80 text-white"
+                  ? "bg-white hover:opacity-80 text-black"
                   : "bg-transparent hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
               )}
               onClick={() => {
@@ -837,7 +836,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
               ) : isRecording ? (
                 <StopCircle className="h-5 w-5 text-red-500" />
               ) : hasContent ? (
-                <ArrowUp className="h-4 w-4 text-white" />
+                <ArrowUp className="h-4 w-4 text-black" />
               ) : (
                 <Mic className="h-5 w-5 text-[var(--text-primary)] transition-colors" />
               )}

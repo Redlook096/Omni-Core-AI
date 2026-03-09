@@ -23,7 +23,6 @@ export interface ChatMessageProps {
   isSearching?: boolean;
   isThinking?: boolean;
   isCanvas?: boolean;
-  messageStyle?: 'modern' | 'classic';
 }
 
 const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' | 'normal' | 'fast' = 'normal') => {
@@ -244,12 +243,16 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                                          <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
                                          <span className="flex-1 leading-relaxed">{line.trim().substring(2)}</span>
                                       </span>
+                                    ) : line.trim().startsWith('>') ? (
+                                      <blockquote className="border-l-4 border-[var(--border-color)] pl-4 py-2 my-4 text-[var(--text-secondary)] italic bg-[var(--bg-hover)]/50 rounded-r-lg">
+                                        {line.trim().replace(/^>[;\s]*/, '')}
+                                      </blockquote>
                                     ) : (
                                       <span className={cn(line.trim() === "" ? "block h-4" : "")}>
                                          {line}
                                       </span>
                                     )}
-                                    {l < arr.length - 1 && line.trim() !== "" && !line.trim().startsWith('-') && !line.trim().startsWith('•') && <br />}
+                                    {l < arr.length - 1 && line.trim() !== "" && !line.trim().startsWith('-') && !line.trim().startsWith('•') && !line.trim().startsWith('>') && <br />}
                                   </React.Fragment>
                                 ));
                               })}
@@ -269,14 +272,14 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
         <motion.span
           animate={{ opacity: [0, 1, 0] }}
           transition={{ duration: 0.8, repeat: Infinity }}
-          className="inline-block w-2 h-5 bg-[var(--accent-color)] ml-1 align-middle"
+          className="inline-block w-2 h-5 bg-[var(--text-primary)] ml-1 align-middle"
         />
       )}
     </div>
   );
 });
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, isThinking, isCanvas, typingSpeed = 'normal', messageStyle = 'modern' }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, isThinking, isCanvas, typingSpeed = 'normal' }) => {
   const isUser = role === 'user';
   const [isCopied, setIsCopied] = useState(false);
 
@@ -322,10 +325,14 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
       )}
 
       <div className={cn(
-        "flex flex-col gap-1 min-w-0 max-w-full",
-        isUser ? "items-end" : "items-start w-full"
+        "flex gap-4 min-w-0 max-w-full",
+        isUser ? "justify-end w-full" : "w-full"
       )}>
-        <AnimatePresence mode="wait">
+        <div className={cn(
+          "flex flex-col gap-1 min-w-0 max-w-full flex-1",
+          isUser ? "items-end" : "items-start"
+        )}>
+          <AnimatePresence mode="wait">
           {showLoader ? (
             <motion.div 
               key="loader"
@@ -388,12 +395,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               className={cn(
                 "text-[15px] leading-7 md:text-[16px] relative transition-all duration-300",
                 isUser 
-                  ? (messageStyle === 'modern' 
-                      ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3 rounded-2xl rounded-tr-sm shadow-sm max-w-[85vw] md:max-w-[600px]"
-                      : "bg-[var(--accent-color)] text-white px-5 py-3 rounded-[20px] rounded-br-[4px] shadow-sm max-w-[85vw] md:max-w-[600px]")
-                  : (messageStyle === 'modern'
-                      ? "text-[var(--text-primary)] px-6 py-4 w-full border-none rounded-xl backdrop-blur-sm"
-                      : "bg-[var(--bg-card)] text-[var(--text-primary)] px-5 py-4 rounded-[20px] rounded-bl-[4px] shadow-sm max-w-[85vw] md:max-w-[800px] border border-[var(--border-color)]")
+                  ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85vw] md:max-w-[600px]"
+                  : "text-[var(--text-primary)] px-2 py-4 w-full"
               )}
             >
               {isUser ? displayContent : <FormatText text={displayedContent} isStreaming={isStreaming} />}
@@ -448,6 +451,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
             </motion.button>
           </div>
         )}
+        </div>
       </div>
     </motion.div>
   );

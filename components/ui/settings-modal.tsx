@@ -22,8 +22,6 @@ interface SettingsModalProps {
   setIsDark: (value: boolean) => void;
   sendWithEnter: boolean;
   setSendWithEnter: (value: boolean) => void;
-  messageStyle: 'modern' | 'classic';
-  setMessageStyle: (value: 'modern' | 'classic') => void;
   aiName: string;
   setAiName: (value: string) => void;
   aiMemory: string;
@@ -50,8 +48,6 @@ export function SettingsModal({
   setIsDark,
   sendWithEnter,
   setSendWithEnter,
-  messageStyle,
-  setMessageStyle,
   aiName,
   setAiName,
   aiMemory,
@@ -313,32 +309,6 @@ export function SettingsModal({
                             )}
                           >
                             {t(language, size)}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="h-px w-full bg-[var(--border-color)]" />
-
-                    {/* Message Style */}
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                        <MessageSquare className="w-4 h-4 text-[var(--text-secondary)]" />
-                        Message Bubble Style
-                      </label>
-                      <div className="flex bg-[var(--bg-input)] rounded-lg p-1 w-fit border border-[var(--border-color)]">
-                        {(['modern', 'classic'] as const).map((style) => (
-                          <button
-                            key={style}
-                            onClick={() => setMessageStyle(style)}
-                            className={cn(
-                              "px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize",
-                              messageStyle === style
-                                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]"
-                                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
-                            )}
-                          >
-                            {style}
                           </button>
                         ))}
                       </div>
