@@ -7,9 +7,10 @@ interface CodeRunnerProps {
   onClose: () => void;
   code: string;
   language: string;
+  isFixingErrors?: boolean;
 }
 
-export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, language }) => {
+export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, language, isFixingErrors }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [output, setOutput] = useState<string>('');
   const [isRunning, setIsRunning] = useState(false);
@@ -141,7 +142,10 @@ export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, l
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className={`fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm ${isFullscreen ? 'p-0' : 'p-4 sm:p-6'}`}>
+        <div 
+          className={`fixed inset-0 z-[100] flex items-start justify-center bg-black/50 backdrop-blur-sm ${isFullscreen ? 'p-0' : 'p-4 pt-12 sm:p-6 sm:pt-16'}`}
+          onClick={onClose}
+        >
           <style>
             {`
               @keyframes fast-blink {
@@ -158,6 +162,7 @@ export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, l
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.98, y: 10 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
+            onClick={(e) => e.stopPropagation()}
             className={`flex flex-col bg-[#000000] overflow-hidden shadow-2xl transition-all duration-300 ${
               isFullscreen ? 'w-full h-full rounded-none border-none' : 'w-full max-w-5xl h-[85vh] border border-white/10 rounded-2xl'
             }`}
@@ -199,6 +204,13 @@ export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, l
 
             {/* Content */}
             <div className="flex-1 relative overflow-hidden bg-black">
+              {isFixingErrors && (
+                <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/80 backdrop-blur-sm">
+                  <RefreshCw className="w-8 h-8 text-indigo-400 animate-spin mb-4" />
+                  <div className="text-white font-medium">AI is fixing errors...</div>
+                  <div className="text-gray-400 text-sm mt-2">Please wait while the code is updated.</div>
+                </div>
+              )}
               {isHtml ? (
                 <iframe
                   ref={iframeRef}
@@ -208,7 +220,7 @@ export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, l
                 />
               ) : (
                 <div 
-                  className="w-full h-full p-2 sm:p-3 overflow-auto whitespace-pre-wrap relative"
+                  className="w-full h-full p-2 sm:p-3 overflow-auto whitespace-pre-wrap relative custom-scrollbar"
                   style={{
                     background: '#000000',
                     fontFamily: 'Consolas, monospace',

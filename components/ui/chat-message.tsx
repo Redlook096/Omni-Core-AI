@@ -73,6 +73,123 @@ const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' |
   return isEnabled ? displayedText : text;
 };
 
+const CodeBlock = ({ code, language }: { code: string, language: string }) => {
+  const [isEditing, setIsEditing] = React.useState(false);
+  const [editedCode, setEditedCode] = React.useState(code);
+
+  return (
+    <div className="my-4 rounded-xl bg-[#1e1e1e] border border-white/10 shadow-lg">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2d2d] text-xs text-gray-400 sticky top-0 md:top-0 z-20 rounded-t-xl border-b border-white/10">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-gray-200">Code</span>
+          <span>·</span>
+          <span>{language}</span>
+        </div>
+        <div className="flex items-center gap-3">
+          {isEditing ? (
+            <>
+              <button 
+                onClick={() => setIsEditing(false)}
+                className="hover:text-white transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={() => {
+                  setIsEditing(false);
+                  window.dispatchEvent(new CustomEvent('ask-ai-code', { 
+                    detail: { code: editedCode, language } 
+                  }));
+                }}
+                className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
+              >
+                <Check className="w-3 h-3" /> Save & Ask AI
+              </button>
+            </>
+          ) : (
+            <>
+              <button 
+                onClick={() => {
+                  navigator.clipboard.writeText(code);
+                }}
+                className="hover:text-white transition-colors flex items-center gap-1"
+              >
+                <Copy className="w-3 h-3" /> Copy
+              </button>
+              <button 
+                onClick={() => {
+                  setIsEditing(true);
+                  setEditedCode(code);
+                }}
+                className="hover:text-white transition-colors"
+              >
+                Edit
+              </button>
+              <button 
+                onClick={() => {
+                  const blob = new Blob([code], { type: 'text/plain' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  
+                  const extMap: Record<string, string> = {
+                    'javascript': 'js', 'typescript': 'ts', 'python': 'py',
+                    'cpp': 'cpp', 'c++': 'cpp', 'c': 'c', 'java': 'java',
+                    'go': 'go', 'rust': 'rs', 'php': 'php', 'ruby': 'rb',
+                    'bash': 'sh', 'sh': 'sh', 'csharp': 'cs', 'cs': 'cs',
+                    'html': 'html', 'css': 'css', 'json': 'json', 'xml': 'xml',
+                    'sql': 'sql', 'markdown': 'md', 'md': 'md'
+                  };
+                  const ext = extMap[language.toLowerCase()] || 'txt';
+                  a.download = `snippet.${ext}`;
+                  
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                }}
+                className="hover:text-white transition-colors"
+              >
+                Download
+              </button>
+              <button 
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent('run-code', { detail: { code, language } }));
+                }}
+                className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
+              >
+                Run code
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+      <div className="overflow-x-auto text-sm font-mono text-gray-300 rounded-b-xl custom-scrollbar">
+        {isEditing ? (
+          <textarea
+            value={editedCode}
+            onChange={(e) => setEditedCode(e.target.value)}
+            className="w-full min-h-[200px] p-4 bg-transparent text-gray-300 font-mono text-sm resize-y focus:outline-none custom-scrollbar"
+            spellCheck={false}
+          />
+        ) : (
+          <SyntaxHighlighter
+            language={language}
+            style={vscDarkPlus}
+            customStyle={{
+              margin: 0,
+              padding: '1rem',
+              background: 'transparent',
+            }}
+          >
+            {code}
+          </SyntaxHighlighter>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreaming?: boolean }) => {
   if (!text) return null;
 
@@ -122,85 +239,7 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                 const language = match ? match[1] || 'text' : 'text';
                 const code = match ? match[2] : codePart.slice(3, isClosed ? -3 : undefined);
                 
-                return (
-                  <div key={codeIdx} className="my-4 rounded-xl bg-[#1e1e1e] border border-white/10 shadow-lg">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2d2d] text-xs text-gray-400 sticky top-14 md:top-0 z-20 rounded-t-xl border-b border-white/10">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-200">Code</span>
-                        <span>·</span>
-                        <span>{language}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          onClick={() => {
-                            navigator.clipboard.writeText(code);
-                            // Could add a toast here
-                          }}
-                          className="hover:text-white transition-colors flex items-center gap-1"
-                        >
-                          <Copy className="w-3 h-3" /> Copy
-                        </button>
-                        <button 
-                          onClick={() => {
-                            window.dispatchEvent(new CustomEvent('set-prompt', { detail: code }));
-                          }}
-                          className="hover:text-white transition-colors"
-                        >
-                          Edit
-                        </button>
-                        <button 
-                          onClick={() => {
-                            const blob = new Blob([code], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const a = document.createElement('a');
-                            a.href = url;
-                            
-                            // Map common languages to extensions
-                            const extMap: Record<string, string> = {
-                              'javascript': 'js', 'typescript': 'ts', 'python': 'py',
-                              'cpp': 'cpp', 'c++': 'cpp', 'c': 'c', 'java': 'java',
-                              'go': 'go', 'rust': 'rs', 'php': 'php', 'ruby': 'rb',
-                              'bash': 'sh', 'sh': 'sh', 'csharp': 'cs', 'cs': 'cs',
-                              'html': 'html', 'css': 'css', 'json': 'json', 'xml': 'xml',
-                              'sql': 'sql', 'markdown': 'md', 'md': 'md'
-                            };
-                            const ext = extMap[language.toLowerCase()] || 'txt';
-                            a.download = `snippet.${ext}`;
-                            
-                            document.body.appendChild(a);
-                            a.click();
-                            document.body.removeChild(a);
-                            URL.revokeObjectURL(url);
-                          }}
-                          className="hover:text-white transition-colors"
-                        >
-                          Download
-                        </button>
-                        <button 
-                          onClick={() => {
-                            window.dispatchEvent(new CustomEvent('run-code', { detail: { code, language } }));
-                          }}
-                          className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
-                        >
-                          Run code
-                        </button>
-                      </div>
-                    </div>
-                    <div className="overflow-x-auto text-sm font-mono text-gray-300 rounded-b-xl">
-                      <SyntaxHighlighter
-                        language={language}
-                        style={vscDarkPlus}
-                        customStyle={{
-                          margin: 0,
-                          padding: '1rem',
-                          background: 'transparent',
-                        }}
-                      >
-                        {code}
-                      </SyntaxHighlighter>
-                    </div>
-                  </div>
-                );
+                return <CodeBlock key={codeIdx} code={code} language={language} />;
               }
 
               // Split by headers ***
@@ -309,7 +348,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
 
   return (
     <motion.div 
-      layout={!isStreaming}
       initial={{ opacity: 0, y: 20, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       exit={{ opacity: 0, scale: 0.95 }}
@@ -385,13 +423,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
           ) : (
             <motion.div
               key="content"
-              initial={{ opacity: 0, scale: 0.98, y: 10 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ 
-                type: "spring",
-                stiffness: 500,
-                damping: 30
-              }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3 }}
               className={cn(
                 "text-[15px] leading-7 md:text-[16px] relative transition-all duration-300",
                 isUser 

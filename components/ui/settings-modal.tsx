@@ -63,6 +63,29 @@ export function SettingsModal({
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'advanced'>('general');
 
+  const [localResponseLength, setLocalResponseLength] = useState(
+    responseLength === 'short' ? 0 : responseLength === 'medium' ? 50 : 100
+  );
+  const [localCreativity, setLocalCreativity] = useState(
+    creativityLevel === 'low' ? 0 : creativityLevel === 'medium' ? 50 : 100
+  );
+  const [localFontSize, setLocalFontSize] = useState(
+    fontSize === 'small' ? 0 : fontSize === 'base' ? 50 : 100
+  );
+
+  // Sync local state when props change
+  React.useEffect(() => {
+    setLocalResponseLength(responseLength === 'short' ? 0 : responseLength === 'medium' ? 50 : 100);
+  }, [responseLength]);
+
+  React.useEffect(() => {
+    setLocalCreativity(creativityLevel === 'low' ? 0 : creativityLevel === 'medium' ? 50 : 100);
+  }, [creativityLevel]);
+
+  React.useEffect(() => {
+    setLocalFontSize(fontSize === 'small' ? 0 : fontSize === 'base' ? 50 : 100);
+  }, [fontSize]);
+
   const tabs = [
     { id: 'general', label: t(language, 'general'), icon: Settings },
     { id: 'appearance', label: t(language, 'appearance'), icon: Palette },
@@ -79,6 +102,57 @@ export function SettingsModal({
     { id: 'Pirate', label: 'Pirate', desc: 'Arrr matey!', icon: Zap },
     { id: 'Sarcastic', label: 'Sarcastic', desc: 'Witty and dry', icon: MessageSquare },
   ];
+
+  const handleResetDefaults = () => {
+    setLanguage('English');
+    setAiMood('Neutral');
+    setResponseLength('medium');
+    setCreativityLevel('medium');
+    setFontSize('base');
+    setIsDark(true);
+    setSendWithEnter(true);
+    setAiMemory('');
+    setFontFamily('sans');
+    setDeveloperMode(false);
+    setStreamResponses(true);
+  };
+
+  const getPersonalityPreviewText = () => {
+    let text = "Here is a preview of how the AI will respond based on your current settings.";
+    
+    if (aiMood === 'Pirate') {
+      text = "Arrr matey! Here be a preview of how yer AI companion will be speakin' to ye, based on the settings ye've chosen.";
+    } else if (aiMood === 'Sarcastic') {
+      text = "Oh, look. Another preview text. I'm sure you're absolutely thrilled to see how your settings affect this completely generic sentence.";
+    } else if (aiMood === 'Professional') {
+      text = "This is a demonstration of the AI's response format, reflecting your current configuration parameters.";
+    } else if (aiMood === 'Creative') {
+      text = "Imagine a world where words dance across the screen... this preview is a glimpse into that vibrant reality, shaped by your choices.";
+    } else if (aiMood === 'Friendly') {
+      text = "Hi there! This is just a quick preview to show you how your AI buddy will chat with you using these settings. Hope you like it!";
+    }
+
+    return text;
+  };
+
+  const getFormattingPreviewText = () => {
+    let text = "The AI will generate responses with a balanced level of detail and standard phrasing.";
+    
+    if (creativityLevel === 'low') {
+      text = "The AI will generate highly factual, precise, and deterministic responses.";
+    } else if (creativityLevel === 'high') {
+      text = "The AI will generate highly imaginative, varied, and expressive responses, exploring novel ideas.";
+    }
+
+    if (responseLength === 'short') {
+      text = text.split(',')[0] + '.';
+      if (text.length > 60) text = text.substring(0, 60) + '...';
+    } else if (responseLength === 'long') {
+      text += " It will elaborate extensively on the topic, providing comprehensive background information, multiple examples, and deeper analysis to ensure you have a complete understanding of the subject matter.";
+    }
+
+    return text;
+  };
 
   return (
     <AnimatePresence>
@@ -122,6 +196,16 @@ export function SettingsModal({
                   </button>
                 );
               })}
+              
+              <div className="mt-auto hidden md:block pt-4">
+                <button
+                  onClick={handleResetDefaults}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-hover)]/50 hover:text-[var(--text-primary)] transition-colors"
+                >
+                  <Settings className="w-4 h-4" />
+                  Reset to Defaults
+                </button>
+              </div>
             </div>
 
             {/* Content */}
@@ -136,36 +220,22 @@ export function SettingsModal({
               <div className="max-w-2xl">
                 <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-8 capitalize">{t(language, activeTab)}</h3>
 
-                {activeTab === 'general' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* AI Identity */}
-                    <div className="space-y-4">
-                      <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                        <Smile className="w-4 h-4 text-[var(--text-secondary)]" />
-                        Custom Instructions
-                      </label>
+                <AnimatePresence mode="wait">
+                  {activeTab === 'general' && (
+                    <motion.div 
+                      key="general"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="space-y-8"
+                    >
+                      {/* AI Mood */}
                       <div className="space-y-4">
-                        <div>
-                          <label className="block text-xs text-[var(--text-muted)] mb-1.5">Memory / Behavior Rules</label>
-                          <textarea
-                            value={aiMemory}
-                            onChange={(e) => setAiMemory(e.target.value)}
-                            placeholder="What would you like the AI to remember about you or how it should behave?"
-                            rows={3}
-                            className="w-full p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--text-primary)] transition-shadow resize-none"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="h-px w-full bg-[var(--border-color)]" />
-
-                    {/* AI Mood */}
-                    <div className="space-y-4">
-                      <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[var(--text-secondary)]" />
-                        AI Personality
-                      </label>
+                        <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[var(--text-secondary)]" />
+                          AI Personality
+                        </label>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {moodOptions.map((mood) => {
                           const Icon = mood.icon;
@@ -198,6 +268,18 @@ export function SettingsModal({
                             </button>
                           );
                         })}
+                      </div>
+
+                      {/* Live Preview */}
+                      <div className="mt-6 p-4 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-1 h-full bg-[var(--text-primary)]" />
+                        <div className="flex items-center gap-2 mb-2">
+                          <MessageSquare className="w-4 h-4 text-[var(--text-secondary)]" />
+                          <span className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider">Live Preview</span>
+                        </div>
+                        <p className="text-sm text-[var(--text-primary)] leading-relaxed italic">
+                          "{getPersonalityPreviewText()}"
+                        </p>
                       </div>
                     </div>
 
@@ -237,15 +319,21 @@ export function SettingsModal({
                       </div>
                       <div className="px-2">
                         <Slider
-                          value={[responseLength === 'short' ? 0 : responseLength === 'medium' ? 50 : 100]}
+                          value={[localResponseLength]}
                           onValueChange={(val) => {
-                            if (val[0] === 0) setResponseLength('short');
-                            else if (val[0] === 50) setResponseLength('medium');
+                            setLocalResponseLength(val[0]);
+                            if (val[0] < 33) setResponseLength('short');
+                            else if (val[0] < 66) setResponseLength('medium');
                             else setResponseLength('long');
                           }}
                           max={100}
-                          step={50}
+                          step={1}
                         />
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
+                          <span className={cn(responseLength === 'short' && "text-[var(--text-primary)] font-medium")}>Short</span>
+                          <span className={cn(responseLength === 'medium' && "text-[var(--text-primary)] font-medium")}>Medium</span>
+                          <span className={cn(responseLength === 'long' && "text-[var(--text-primary)] font-medium")}>Long</span>
+                        </div>
                       </div>
                     </div>
 
@@ -262,24 +350,49 @@ export function SettingsModal({
                       </div>
                       <div className="px-2">
                         <Slider
-                          value={[creativityLevel === 'low' ? 0 : creativityLevel === 'medium' ? 50 : 100]}
+                          value={[localCreativity]}
                           onValueChange={(val) => {
-                            if (val[0] === 0) setCreativityLevel('low');
-                            else if (val[0] === 50) setCreativityLevel('medium');
+                            setLocalCreativity(val[0]);
+                            if (val[0] < 33) setCreativityLevel('low');
+                            else if (val[0] < 66) setCreativityLevel('medium');
                             else setCreativityLevel('high');
                           }}
                           max={100}
-                          step={50}
+                          step={1}
                         />
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
+                          <span className={cn(creativityLevel === 'low' && "text-[var(--text-primary)] font-medium")}>Precise</span>
+                          <span className={cn(creativityLevel === 'medium' && "text-[var(--text-primary)] font-medium")}>Balanced</span>
+                          <span className={cn(creativityLevel === 'high' && "text-[var(--text-primary)] font-medium")}>Creative</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
 
-                {activeTab === 'appearance' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Theme */}
-                    <div className="space-y-3">
+                    {/* Formatting Live Preview */}
+                    <div className="mt-8 p-5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] relative overflow-hidden shadow-sm">
+                      <div className="absolute top-0 left-0 w-1 h-full bg-[var(--text-primary)]" />
+                      <div className="flex items-center gap-2 mb-3">
+                        <AlignLeft className="w-4 h-4 text-[var(--text-secondary)]" />
+                        <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Output Formatting Preview</span>
+                      </div>
+                      <p className="text-sm text-[var(--text-primary)] leading-relaxed italic">
+                        "{getFormattingPreviewText()}"
+                      </p>
+                    </div>
+                  </motion.div>
+                  )}
+
+                  {activeTab === 'appearance' && (
+                    <motion.div 
+                      key="appearance"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="space-y-8"
+                    >
+                      {/* Theme */}
+                      <div className="space-y-3">
                       <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
                         <Monitor className="w-4 h-4 text-[var(--text-secondary)]" />
                         {t(language, 'theme')}
@@ -348,24 +461,37 @@ export function SettingsModal({
                       </div>
                       <div className="px-2">
                         <Slider
-                          value={[fontSize === 'small' ? 0 : fontSize === 'base' ? 50 : 100]}
+                          value={[localFontSize]}
                           onValueChange={(val) => {
-                            if (val[0] === 0) setFontSize('small');
-                            else if (val[0] === 50) setFontSize('base');
+                            setLocalFontSize(val[0]);
+                            if (val[0] < 33) setFontSize('small');
+                            else if (val[0] < 66) setFontSize('base');
                             else setFontSize('large');
                           }}
                           max={100}
-                          step={50}
+                          step={1}
                         />
+                        <div className="flex justify-between text-xs text-[var(--text-muted)] mt-2">
+                          <span className={cn(fontSize === 'small' && "text-[var(--text-primary)] font-medium")}>Small</span>
+                          <span className={cn(fontSize === 'base' && "text-[var(--text-primary)] font-medium")}>Base</span>
+                          <span className={cn(fontSize === 'large' && "text-[var(--text-primary)] font-medium")}>Large</span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
+                  </motion.div>
+                  )}
 
-                {activeTab === 'advanced' && (
-                  <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Developer Mode */}
-                    <div className="space-y-3">
+                  {activeTab === 'advanced' && (
+                    <motion.div 
+                      key="advanced"
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.2 }}
+                      className="space-y-8"
+                    >
+                      {/* Developer Mode */}
+                      <div className="space-y-3">
                       <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
                         <Zap className="w-4 h-4 text-[var(--text-secondary)]" />
                         Developer Mode
@@ -384,8 +510,8 @@ export function SettingsModal({
                         >
                           <span
                             className={cn(
-                              "inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform",
-                              developerMode ? "translate-x-6" : "translate-x-1"
+                              "inline-block h-4 w-4 shrink-0 transform rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.3)] border border-black/10 transition-transform",
+                              developerMode ? "bg-[var(--bg-app)] translate-x-6" : "bg-white translate-x-1"
                             )}
                           />
                         </button>
@@ -414,8 +540,8 @@ export function SettingsModal({
                         >
                           <span
                             className={cn(
-                              "inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform",
-                              streamResponses ? "translate-x-6" : "translate-x-1"
+                              "inline-block h-4 w-4 shrink-0 transform rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.3)] border border-black/10 transition-transform",
+                              streamResponses ? "bg-[var(--bg-app)] translate-x-6" : "bg-white translate-x-1"
                             )}
                           />
                         </button>
@@ -444,8 +570,8 @@ export function SettingsModal({
                         >
                           <span
                             className={cn(
-                              "inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform",
-                              sendWithEnter ? "translate-x-6" : "translate-x-1"
+                              "inline-block h-4 w-4 shrink-0 transform rounded-full shadow-[0_1px_3px_rgba(0,0,0,0.3)] border border-black/10 transition-transform",
+                              sendWithEnter ? "bg-[var(--bg-app)] translate-x-6" : "bg-white translate-x-1"
                             )}
                           />
                         </button>
@@ -496,8 +622,9 @@ export function SettingsModal({
                       </button>
                       <p className="text-xs text-[var(--text-muted)]">This action cannot be undone. All your chat history will be permanently deleted.</p>
                     </div>
-                  </div>
-                )}
+                  </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             </div>
           </motion.div>

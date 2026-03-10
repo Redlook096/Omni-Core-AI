@@ -142,7 +142,7 @@ export default function App() {
   });
   const [currentSuggestions, setCurrentSuggestions] = useState<Suggestion[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, language: string}>({ isOpen: false, code: '', language: '' });
+  const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, language: string, isFixingErrors?: boolean}>({ isOpen: false, code: '', language: '', isFixingErrors: false });
   const handleSubmitRef = useRef<(value: string) => void>();
   
   const [history, setHistory] = useState<ChatSession[]>(() => {
@@ -202,8 +202,19 @@ export default function App() {
       const { code, language, error } = customEvent.detail;
       const prompt = `The following ${language} code failed to execute:\n\n\`\`\`${language}\n${code}\n\`\`\`\n\nIt produced this error:\n\`\`\`\n${error}\n\`\`\`\n\nPlease fix the code and provide the fully functional version. Ensure it is 100% functional and fixes the error.`;
       
-      // Close the code runner so they can see the chat
-      setRunnerState(prev => ({ ...prev, isOpen: false }));
+      // Keep the code runner open and show fixing state
+      setRunnerState(prev => ({ ...prev, isFixingErrors: true }));
+      
+      // Send the message
+      if (handleSubmitRef.current) {
+        handleSubmitRef.current(prompt);
+      }
+    };
+
+    const handleAskAiCode = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { code, language } = customEvent.detail;
+      const prompt = `I have updated the ${language} code with some edits/comments. Please review my changes, implement any requested features or fixes mentioned in the comments, and provide the fully functional updated version:\n\n\`\`\`${language}\n${code}\n\`\`\``;
       
       // Send the message
       if (handleSubmitRef.current) {
@@ -214,10 +225,12 @@ export default function App() {
     window.addEventListener('run-code', handleRunCode);
     window.addEventListener('set-prompt', handleSetPrompt);
     window.addEventListener('auto-fix-code', handleAutoFixCode);
+    window.addEventListener('ask-ai-code', handleAskAiCode);
     return () => {
       window.removeEventListener('run-code', handleRunCode);
       window.removeEventListener('set-prompt', handleSetPrompt);
       window.removeEventListener('auto-fix-code', handleAutoFixCode);
+      window.removeEventListener('ask-ai-code', handleAskAiCode);
     };
   }, []);
   useEffect(() => {
@@ -435,6 +448,17 @@ export default function App() {
           return updated;
         });
       }
+
+      setRunnerState(prev => {
+        if (prev.isOpen && prev.isFixingErrors) {
+          const match = fullResponse.match(/```(\w+)?\n([\s\S]*?)(?:```|$)/);
+          if (match) {
+            return { ...prev, code: match[2], language: match[1] || prev.language, isFixingErrors: false };
+          }
+          return { ...prev, isFixingErrors: false };
+        }
+        return prev;
+      });
     } catch (error) {
       console.error("Error generating response:", error);
       setMessages(prev => [...prev, { role: 'model', content: "Sorry, I encountered an error." }]);
@@ -485,6 +509,17 @@ export default function App() {
         const updated = [...prev];
         updated[updated.length - 1] = { role: 'model', content: accumulatedResponse };
         return updated;
+      });
+
+      setRunnerState(prev => {
+        if (prev.isOpen && prev.isFixingErrors) {
+          const match = accumulatedResponse.match(/```(\w+)?\n([\s\S]*?)(?:```|$)/);
+          if (match) {
+            return { ...prev, code: match[2], language: match[1] || prev.language, isFixingErrors: false };
+          }
+          return { ...prev, isFixingErrors: false };
+        }
+        return prev;
       });
 
     } catch (error) {
@@ -753,7 +788,7 @@ export default function App() {
         onScroll={handleScroll}
         animate={{ paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px" }}
         transition={SIDEBAR_TRANSITION}
-        className="flex-1 w-full flex flex-col items-center relative h-screen overflow-y-auto overflow-x-hidden"
+        className="flex-1 w-full flex flex-col items-center relative h-screen overflow-y-auto"
       >
         
         {/* Scrollable Content Container */}
@@ -878,9 +913,9 @@ export default function App() {
                 {hasStarted && (
                   <motion.div 
                     key={currentSessionId || 'new-session'}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -20 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
                     className="w-full flex-1 flex flex-col gap-8"
                   >
@@ -957,7 +992,9 @@ export default function App() {
 
       {/* Dock & Indicator */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (
-        <div 
+        <motion.div 
+          animate={{ paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px" }}
+          transition={SIDEBAR_TRANSITION}
           className="fixed bottom-0 left-0 w-full h-10 z-[200] pointer-events-none flex flex-col justify-end items-center pb-0"
         >
           <div 
@@ -1024,7 +1061,7 @@ export default function App() {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute bottom-4 flex flex-col items-center justify-center cursor-pointer group"
+                  className="absolute bottom-1 flex flex-col items-center justify-center cursor-pointer group"
                 >
                   <div className="flex flex-col items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
                     <div className="w-10 h-1 rounded-full bg-[var(--text-muted)]" />
@@ -1034,7 +1071,7 @@ export default function App() {
               )}
             </AnimatePresence>
           </div>
-        </div>
+        </motion.div>
       )}
 
       {/* Modals */}
@@ -1088,6 +1125,7 @@ export default function App() {
         onClose={() => setRunnerState(prev => ({ ...prev, isOpen: false }))}
         code={runnerState.code}
         language={runnerState.language}
+        isFixingErrors={runnerState.isFixingErrors}
       />
 
     </div>

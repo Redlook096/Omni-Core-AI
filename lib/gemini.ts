@@ -117,7 +117,7 @@ export async function* streamChat(
   customPersona?: string,
   isRegeneration: boolean = false,
   creativityLevel: 'low' | 'medium' | 'high' = 'medium'
-): AsyncGenerator<{ text: string, chunkData?: any }> {
+): AsyncGenerator<string> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
   let finalSystemInstruction = customPersona 
@@ -160,7 +160,7 @@ export async function* streamChat(
 
   for await (const chunk of result) {
     if (chunk.text) {
-      yield { text: chunk.text, chunkData: chunk };
+      yield chunk.text;
     }
   }
 }
