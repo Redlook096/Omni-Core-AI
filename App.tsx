@@ -4,7 +4,7 @@ import { Dock, DockIcon, DockItem, DockLabel } from './components/ui/dock';
 import { Home, BookOpen, ChevronDown } from 'lucide-react';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
-import { streamChat, generateTitle, generateSuggestions } from './lib/gemini';
+import { streamChat, generateTitle } from './lib/gemini';
 import { t } from './lib/translations';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Download, Code, Zap, BarChart, Bug, Languages } from 'lucide-react';
@@ -74,19 +74,15 @@ interface Suggestion {
   subtext: string;
   prompt?: string;
   autoSend?: boolean;
-  action?: 'open-runner' | 'open-settings' | 'open-story' | 'toggle-theme';
+  action?: 'open-runner' | 'open-settings' | 'open-story' | 'toggle-theme' | 'open-chat-manager';
 }
 
 const SUGGESTIONS_POOL: Suggestion[] = [
-  { iconName: 'Code', text: 'Deep Code Analyzer', subtext: 'Identify bugs & optimize', prompt: 'Act as a Senior Staff Engineer. Analyze the following code for performance bottlenecks, security vulnerabilities, and architectural flaws. Provide a structured report with actionable fixes:\n\n', autoSend: false },
-  { iconName: 'Zap', text: 'Strategic Planner', subtext: 'Multi-step execution plan', prompt: 'Act as a Strategic Mastermind. Break down the following goal into a comprehensive, multi-step execution plan with timelines, risk assessments, and resource allocation:\n\n', autoSend: false },
-  { iconName: 'BarChart', text: 'Data Insights Engine', subtext: 'Statistical anomaly detection', prompt: 'Act as a Lead Data Scientist. Analyze this dataset. Identify statistical anomalies, hidden correlations, and predictive trends. Output the results in a structured JSON format:\n\n', autoSend: false },
-  { iconName: 'FileText', text: 'Contract Reviewer', subtext: 'Legal loophole detection', prompt: 'Act as an Expert Legal Counsel. Review the following text for potential loopholes, ambiguous clauses, and liabilities. Highlight critical risks and suggest precise revisions:\n\n', autoSend: false },
-  { iconName: 'Bug', text: 'Root Cause Diagnostics', subtext: 'System failure analysis', prompt: 'Act as a Site Reliability Engineer. Diagnose the root cause of the following system error or log output. Provide a step-by-step mitigation strategy and a post-mortem summary:\n\n', autoSend: false },
-  { iconName: 'Languages', text: 'Semantic Translator', subtext: 'Preserve cultural nuance', prompt: 'Act as a Master Linguist. Translate the following text, but preserve all cultural nuances, idioms, and emotional undertones. Provide the translation along with a breakdown of the linguistic choices made:\n\n', autoSend: false },
   { iconName: 'SquarePen', text: 'Code Playground', subtext: 'Write & run code instantly', action: 'open-runner' },
   { iconName: 'Settings', text: 'App Preferences', subtext: 'Customize your experience', action: 'open-settings' },
-  { iconName: 'MessageSquare', text: 'Immersive Story', subtext: 'Enter story mode', action: 'open-story' }
+  { iconName: 'MessageSquare', text: 'Immersive Story', subtext: 'Enter story mode', action: 'open-story' },
+  { iconName: 'Zap', text: 'Toggle Theme', subtext: 'Switch light/dark mode', action: 'toggle-theme' },
+  { iconName: 'FileText', text: 'Chat History', subtext: 'Manage past conversations', action: 'open-chat-manager' }
 ];
 
 const AnimatedMenuIcon = ({ isOpen }: { isOpen: boolean }) => (
@@ -129,9 +125,14 @@ export default function App() {
   const [responseLength, setResponseLength] = useState<'short' | 'medium' | 'long'>('medium');
   const [creativityLevel, setCreativityLevel] = useState<'low' | 'medium' | 'high'>('medium');
   const [fontSize, setFontSize] = useState<'small' | 'base' | 'large'>('base');
-  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>('sans');
-  const [aiName, setAiName] = useState(() => {
-    return localStorage.getItem('aiName') || 'Gemini';
+  const [fontFamily, setFontFamily] = useState<'sans' | 'serif' | 'mono'>(() => {
+    return (localStorage.getItem('fontFamily') as 'sans' | 'serif' | 'mono') || 'sans';
+  });
+  const [developerMode, setDeveloperMode] = useState(() => {
+    return localStorage.getItem('developerMode') === 'true';
+  });
+  const [streamResponses, setStreamResponses] = useState(() => {
+    return localStorage.getItem('streamResponses') !== 'false';
   });
   const [aiMemory, setAiMemory] = useState(() => {
     return localStorage.getItem('aiMemory') || '';
@@ -223,28 +224,13 @@ export default function App() {
     if (!hasStarted) {
       setInputValue(''); // Clear input on new chat
       
-      // Generate dynamic suggestions based on history
-      const fetchSuggestions = async () => {
-        const suggestions = await generateSuggestions(history);
-        if (suggestions && suggestions.length > 0) {
-          setCurrentSuggestions(suggestions);
-        } else {
-          // Fallback if generation fails
-          const shuffled = [...SUGGESTIONS_POOL].sort(() => 0.5 - Math.random());
-          setCurrentSuggestions(shuffled.slice(0, 3));
-        }
-      };
-      
-      fetchSuggestions();
+      // Use static functional suggestions
+      const shuffled = [...SUGGESTIONS_POOL].sort(() => 0.5 - Math.random());
+      setCurrentSuggestions(shuffled.slice(0, 3));
     }
   }, [hasStarted, history]);
 
   useEffect(() => {
-    localStorage.setItem('aiName', aiName);
-  }, [aiName]);
-
-  useEffect(() => {
-    localStorage.setItem('aiMemory', aiMemory);
   }, [aiMemory]);
 
   useEffect(() => {
@@ -288,6 +274,14 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('sendWithEnter', sendWithEnter.toString());
   }, [sendWithEnter]);
+
+  useEffect(() => {
+    localStorage.setItem('developerMode', developerMode.toString());
+  }, [developerMode]);
+
+  useEffect(() => {
+    localStorage.setItem('streamResponses', streamResponses.toString());
+  }, [streamResponses]);
 
   const handleScroll = () => {
     if (!mainContentRef.current) return;
@@ -419,11 +413,22 @@ export default function App() {
       setMessages(prev => [...prev, { role: 'model', content: '' }]);
       
       let fullResponse = '';
-      const customPersona = `Your name is ${aiName}. ${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
       const stream = streamChat(newMessages, value, customPersona, false, creativityLevel);
       
-      for await (const chunk of stream) {
-        fullResponse += chunk;
+      if (streamResponses) {
+        for await (const chunk of stream) {
+          fullResponse += chunk;
+          setMessages(prev => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { role: 'model', content: fullResponse };
+            return updated;
+          });
+        }
+      } else {
+        for await (const chunk of stream) {
+          fullResponse += chunk;
+        }
         setMessages(prev => {
           const updated = [...prev];
           updated[updated.length - 1] = { role: 'model', content: fullResponse };
@@ -456,7 +461,7 @@ export default function App() {
     let accumulatedResponse = '';
     
     try {
-      const customPersona = `Your name is ${aiName}. ${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
       const stream = streamChat(historyUpToNow, previousUserMessage.content, customPersona, true, creativityLevel);
       
       for await (const chunk of stream) {
@@ -787,8 +792,8 @@ export default function App() {
                         } : {
                           bg: "transparent",
                           c1: "#000000",
-                          c2: "#333333",
-                          c3: "#666666",
+                          c2: "#0a0a0a",
+                          c3: "#1a1a1a",
                         }}
                       />
                     </motion.div>
@@ -817,7 +822,7 @@ export default function App() {
                     </motion.div>
                     
                     {/* Quick Action Suggestions */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full mt-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full mt-4">
                       {currentSuggestions.map((suggestion, i) => {
                         const IconComponent = {
                           FileText, Lightbulb, MessageSquare, Code, Zap, BarChart, Bug, Languages, SquarePen, Settings
@@ -826,15 +831,16 @@ export default function App() {
                         return (
                           <motion.button
                             key={i}
-                            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-                            animate={{ opacity: 1, y: 0, scale: 1 }}
-                            transition={{ delay: 0.2, duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: 0.2 + i * 0.05, duration: 0.4, ease: "easeOut" }}
                             onClick={() => {
                               if (suggestion.action) {
                                 if (suggestion.action === 'open-runner') setRunnerState({ isOpen: true, code: '', language: 'javascript' });
                                 else if (suggestion.action === 'open-settings') setIsSettingsOpen(true);
                                 else if (suggestion.action === 'open-story') setCurrentView('story');
                                 else if (suggestion.action === 'toggle-theme') setIsDark(!isDark);
+                                else if (suggestion.action === 'open-chat-manager') setIsChatManagerOpen(true);
                               } else if (suggestion.prompt) {
                                 if (suggestion.autoSend) {
                                   handleSubmit(suggestion.prompt);
@@ -846,17 +852,18 @@ export default function App() {
                                 }
                               }
                             }}
-                            className="flex flex-col items-start p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all duration-300 text-left group shadow-sm hover:shadow-md hover:-translate-y-1 relative overflow-hidden"
+                            className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all duration-200 text-left group shadow-sm hover:shadow relative overflow-hidden"
                           >
-                            <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/5 to-purple-500/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                            <div className="flex items-center gap-2 text-[var(--text-primary)] font-medium text-sm mb-1 relative z-10">
-                              <span className="text-[var(--text-secondary)] group-hover:text-indigo-500 transition-colors duration-300">
-                                {IconComponent && <IconComponent className="w-4 h-4" />}
-                              </span>
-                              {suggestion.text}
+                            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-app)] border border-[var(--border-color)] group-hover:border-indigo-500/30 group-hover:bg-indigo-500/5 transition-colors duration-300 shrink-0">
+                              {IconComponent && <IconComponent className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-indigo-500 transition-colors duration-300" />}
                             </div>
-                            <div className="text-xs text-[var(--text-muted)] relative z-10">
-                              {suggestion.subtext}
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[var(--text-primary)] font-medium text-sm truncate">
+                                {suggestion.text}
+                              </span>
+                              <span className="text-[10px] text-[var(--text-muted)] truncate">
+                                {suggestion.subtext}
+                              </span>
                             </div>
                           </motion.button>
                         );
@@ -1012,21 +1019,17 @@ export default function App() {
 
             {/* Animated Dock Indicator */}
             <AnimatePresence>
-              {(hasStarted || currentView !== 'chat') && !isDockHovered && (
+              {(hasStarted || currentView !== 'chat') && !isDockHovered && !isSettingsOpen && (
                 <motion.div 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  className="absolute bottom-4 flex flex-col items-center justify-center cursor-pointer"
+                  className="absolute bottom-4 flex flex-col items-center justify-center cursor-pointer group"
                 >
-                  <motion.div
-                    animate={{ y: [0, -5, 0] }}
-                    transition={{ repeat: Infinity, duration: 2, ease: "easeInOut" }}
-                    className="flex items-center gap-1.5 bg-[var(--bg-card)] border border-[var(--border-color)] px-3 py-1.5 rounded-full shadow-md"
-                  >
-                    <span className="text-[10px] font-semibold text-[var(--text-muted)] uppercase tracking-widest">Menu</span>
-                    <ChevronDown className="w-3 h-3 text-[var(--text-muted)]" />
-                  </motion.div>
+                  <div className="flex flex-col items-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="w-10 h-1 rounded-full bg-[var(--text-muted)]" />
+                    <ChevronDown className="w-4 h-4 text-[var(--text-muted)] mt-0.5" />
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -1070,12 +1073,14 @@ export default function App() {
         setIsDark={setIsDark}
         sendWithEnter={sendWithEnter}
         setSendWithEnter={setSendWithEnter}
-        aiName={aiName}
-        setAiName={setAiName}
         aiMemory={aiMemory}
         setAiMemory={setAiMemory}
         fontFamily={fontFamily}
         setFontFamily={setFontFamily}
+        developerMode={developerMode}
+        setDeveloperMode={setDeveloperMode}
+        streamResponses={streamResponses}
+        setStreamResponses={setStreamResponses}
       />
 
       <CodeRunner 

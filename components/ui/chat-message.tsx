@@ -123,8 +123,8 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                 const code = match ? match[2] : codePart.slice(3, isClosed ? -3 : undefined);
                 
                 return (
-                  <div key={codeIdx} className="my-4 rounded-xl overflow-hidden bg-[#1e1e1e] border border-white/10 shadow-lg">
-                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2d2d] text-xs text-gray-400">
+                  <div key={codeIdx} className="my-4 rounded-xl bg-[#1e1e1e] border border-white/10 shadow-lg">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2d2d] text-xs text-gray-400 sticky top-14 md:top-0 z-20 rounded-t-xl border-b border-white/10">
                       <div className="flex items-center gap-2">
                         <span className="font-medium text-gray-200">Code</span>
                         <span>·</span>
@@ -186,7 +186,7 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                         </button>
                       </div>
                     </div>
-                    <div className="overflow-x-auto text-sm font-mono text-gray-300">
+                    <div className="overflow-x-auto text-sm font-mono text-gray-300 rounded-b-xl">
                       <SyntaxHighlighter
                         language={language}
                         style={vscDarkPlus}

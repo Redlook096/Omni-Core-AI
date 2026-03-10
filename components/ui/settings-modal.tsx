@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Trash2, Zap, Settings, Palette, Moon, Sun, Monitor, Globe, Smile, AlignLeft, Sparkles, Type, MessageSquare, CornerDownLeft } from 'lucide-react';
+import { X, Trash2, Zap, Settings, Palette, Moon, Sun, Monitor, Globe, Smile, AlignLeft, Sparkles, Type, MessageSquare, CornerDownLeft, ChevronDown } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { t } from '../../lib/translations';
+import { Slider } from './slider';
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem } from './dropdown-menu';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -22,12 +24,14 @@ interface SettingsModalProps {
   setIsDark: (value: boolean) => void;
   sendWithEnter: boolean;
   setSendWithEnter: (value: boolean) => void;
-  aiName: string;
-  setAiName: (value: string) => void;
   aiMemory: string;
   setAiMemory: (value: string) => void;
   fontFamily: 'sans' | 'serif' | 'mono';
   setFontFamily: (value: 'sans' | 'serif' | 'mono') => void;
+  developerMode: boolean;
+  setDeveloperMode: (value: boolean) => void;
+  streamResponses: boolean;
+  setStreamResponses: (value: boolean) => void;
 }
 
 export function SettingsModal({
@@ -48,12 +52,14 @@ export function SettingsModal({
   setIsDark,
   sendWithEnter,
   setSendWithEnter,
-  aiName,
-  setAiName,
   aiMemory,
   setAiMemory,
   fontFamily,
-  setFontFamily
+  setFontFamily,
+  developerMode,
+  setDeveloperMode,
+  streamResponses,
+  setStreamResponses
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<'general' | 'appearance' | 'advanced'>('general');
 
@@ -136,21 +142,11 @@ export function SettingsModal({
                     <div className="space-y-4">
                       <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
                         <Smile className="w-4 h-4 text-[var(--text-secondary)]" />
-                        AI Identity
+                        Custom Instructions
                       </label>
                       <div className="space-y-4">
                         <div>
-                          <label className="block text-xs text-[var(--text-muted)] mb-1.5">Name</label>
-                          <input
-                            type="text"
-                            value={aiName}
-                            onChange={(e) => setAiName(e.target.value)}
-                            placeholder="e.g. Gemini, Assistant, Jarvis"
-                            className="w-full max-w-sm p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--text-primary)] transition-shadow"
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-[var(--text-muted)] mb-1.5">Memory / Custom Instructions</label>
+                          <label className="block text-xs text-[var(--text-muted)] mb-1.5">Memory / Behavior Rules</label>
                           <textarea
                             value={aiMemory}
                             onChange={(e) => setAiMemory(e.target.value)}
@@ -213,15 +209,69 @@ export function SettingsModal({
                         <Globe className="w-4 h-4 text-[var(--text-secondary)]" />
                         {t(language, 'aiLanguage')}
                       </label>
-                      <select
-                        value={language}
-                        onChange={(e) => setLanguage(e.target.value)}
-                        className="w-full max-w-xs p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--text-primary)] transition-shadow"
-                      >
-                        {languages.map((lang) => (
-                          <option key={lang} value={lang}>{t(language, lang)}</option>
-                        ))}
-                      </select>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="flex items-center justify-between w-full max-w-xs p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--text-primary)] transition-shadow">
+                          {t(language, language)}
+                          <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                          {languages.map((lang) => (
+                            <DropdownMenuItem key={lang} onClick={() => setLanguage(lang)}>
+                              {t(language, lang)}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+
+                    <div className="h-px w-full bg-[var(--border-color)]" />
+
+                    {/* Response Length */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+                          <AlignLeft className="w-4 h-4 text-[var(--text-secondary)]" />
+                          {t(language, 'responseLength')}
+                        </label>
+                        <span className="text-xs text-[var(--text-muted)] capitalize">{responseLength}</span>
+                      </div>
+                      <div className="px-2">
+                        <Slider
+                          value={[responseLength === 'short' ? 0 : responseLength === 'medium' ? 50 : 100]}
+                          onValueChange={(val) => {
+                            if (val[0] === 0) setResponseLength('short');
+                            else if (val[0] === 50) setResponseLength('medium');
+                            else setResponseLength('long');
+                          }}
+                          max={100}
+                          step={50}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="h-px w-full bg-[var(--border-color)]" />
+
+                    {/* Creativity Level */}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+                          <Sparkles className="w-4 h-4 text-[var(--text-secondary)]" />
+                          {t(language, 'creativityLevel')}
+                        </label>
+                        <span className="text-xs text-[var(--text-muted)] capitalize">{creativityLevel}</span>
+                      </div>
+                      <div className="px-2">
+                        <Slider
+                          value={[creativityLevel === 'low' ? 0 : creativityLevel === 'medium' ? 50 : 100]}
+                          onValueChange={(val) => {
+                            if (val[0] === 0) setCreativityLevel('low');
+                            else if (val[0] === 50) setCreativityLevel('medium');
+                            else setCreativityLevel('high');
+                          }}
+                          max={100}
+                          step={50}
+                        />
+                      </div>
                     </div>
                   </div>
                 )}
@@ -270,47 +320,43 @@ export function SettingsModal({
                         <Type className="w-4 h-4 text-[var(--text-secondary)]" />
                         Font Family
                       </label>
-                      <div className="flex bg-[var(--bg-input)] rounded-lg p-1 w-fit border border-[var(--border-color)]">
-                        {(['sans', 'serif', 'mono'] as const).map((font) => (
-                          <button
-                            key={font}
-                            onClick={() => setFontFamily(font)}
-                            className={cn(
-                              "px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize",
-                              fontFamily === font
-                                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]"
-                                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
-                            )}
-                          >
-                            {font}
-                          </button>
-                        ))}
-                      </div>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger className="flex items-center justify-between w-full max-w-xs p-2.5 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)] text-[var(--text-primary)] text-sm focus:outline-none focus:ring-1 focus:ring-[var(--text-primary)] transition-shadow capitalize">
+                          {fontFamily}
+                          <ChevronDown className="w-4 h-4 text-[var(--text-muted)]" />
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent className="w-[var(--radix-dropdown-menu-trigger-width)]">
+                          {(['sans', 'serif', 'mono'] as const).map((font) => (
+                            <DropdownMenuItem key={font} onClick={() => setFontFamily(font)} className="capitalize">
+                              {font}
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
 
                     <div className="h-px w-full bg-[var(--border-color)]" />
 
                     {/* Font Size */}
-                    <div className="space-y-3">
-                      <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                        <Type className="w-4 h-4 text-[var(--text-secondary)]" />
-                        {t(language, 'fontSize')}
-                      </label>
-                      <div className="flex bg-[var(--bg-input)] rounded-lg p-1 w-fit border border-[var(--border-color)]">
-                        {(['small', 'base', 'large'] as const).map((size) => (
-                          <button
-                            key={size}
-                            onClick={() => setFontSize(size)}
-                            className={cn(
-                              "px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize",
-                              fontSize === size
-                                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]"
-                                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
-                            )}
-                          >
-                            {t(language, size)}
-                          </button>
-                        ))}
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+                          <Type className="w-4 h-4 text-[var(--text-secondary)]" />
+                          {t(language, 'fontSize')}
+                        </label>
+                        <span className="text-xs text-[var(--text-muted)] capitalize">{fontSize}</span>
+                      </div>
+                      <div className="px-2">
+                        <Slider
+                          value={[fontSize === 'small' ? 0 : fontSize === 'base' ? 50 : 100]}
+                          onValueChange={(val) => {
+                            if (val[0] === 0) setFontSize('small');
+                            else if (val[0] === 50) setFontSize('base');
+                            else setFontSize('large');
+                          }}
+                          max={100}
+                          step={50}
+                        />
                       </div>
                     </div>
                   </div>
@@ -318,53 +364,61 @@ export function SettingsModal({
 
                 {activeTab === 'advanced' && (
                   <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                    {/* Response Length */}
+                    {/* Developer Mode */}
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                        <AlignLeft className="w-4 h-4 text-[var(--text-secondary)]" />
-                        {t(language, 'responseLength')}
+                        <Zap className="w-4 h-4 text-[var(--text-secondary)]" />
+                        Developer Mode
                       </label>
-                      <div className="flex bg-[var(--bg-input)] rounded-lg p-1 w-fit border border-[var(--border-color)]">
-                        {(['short', 'medium', 'long'] as const).map((length) => (
-                          <button
-                            key={length}
-                            onClick={() => setResponseLength(length)}
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)]">
+                        <div>
+                          <div className="text-sm font-medium text-[var(--text-primary)]">Enable Developer Features</div>
+                          <div className="text-xs text-[var(--text-muted)]">Show token usage, latency, and raw JSON responses</div>
+                        </div>
+                        <button
+                          onClick={() => setDeveloperMode(!developerMode)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-[var(--bg-card)]",
+                            developerMode ? "bg-[var(--accent-color)]" : "bg-[var(--text-muted)]"
+                          )}
+                        >
+                          <span
                             className={cn(
-                              "px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize",
-                              responseLength === length
-                                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]"
-                                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
+                              "inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform",
+                              developerMode ? "translate-x-6" : "translate-x-1"
                             )}
-                          >
-                            {t(language, length)}
-                          </button>
-                        ))}
+                          />
+                        </button>
                       </div>
                     </div>
 
                     <div className="h-px w-full bg-[var(--border-color)]" />
 
-                    {/* Creativity Level */}
+                    {/* Stream Responses */}
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
-                        <Sparkles className="w-4 h-4 text-[var(--text-secondary)]" />
-                        {t(language, 'creativityLevel')}
+                        <MessageSquare className="w-4 h-4 text-[var(--text-secondary)]" />
+                        Stream Responses
                       </label>
-                      <div className="flex bg-[var(--bg-input)] rounded-lg p-1 w-fit border border-[var(--border-color)]">
-                        {(['low', 'medium', 'high'] as const).map((level) => (
-                          <button
-                            key={level}
-                            onClick={() => setCreativityLevel(level)}
+                      <div className="flex items-center justify-between p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)]">
+                        <div>
+                          <div className="text-sm font-medium text-[var(--text-primary)]">Real-time Streaming</div>
+                          <div className="text-xs text-[var(--text-muted)]">See the AI's response as it's being generated</div>
+                        </div>
+                        <button
+                          onClick={() => setStreamResponses(!streamResponses)}
+                          className={cn(
+                            "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-[var(--bg-card)]",
+                            streamResponses ? "bg-[var(--accent-color)]" : "bg-[var(--text-muted)]"
+                          )}
+                        >
+                          <span
                             className={cn(
-                              "px-4 py-1.5 rounded-md text-sm font-medium transition-all capitalize",
-                              creativityLevel === level
-                                ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]"
-                                : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
+                              "inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform",
+                              streamResponses ? "translate-x-6" : "translate-x-1"
                             )}
-                          >
-                            {t(language, level)}
-                          </button>
-                        ))}
+                          />
+                        </button>
                       </div>
                     </div>
 
@@ -384,13 +438,13 @@ export function SettingsModal({
                         <button
                           onClick={() => setSendWithEnter(!sendWithEnter)}
                           className={cn(
-                            "relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-[var(--bg-card)]",
+                            "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] focus:ring-offset-2 focus:ring-offset-[var(--bg-card)]",
                             sendWithEnter ? "bg-[var(--accent-color)]" : "bg-[var(--text-muted)]"
                           )}
                         >
                           <span
                             className={cn(
-                              "inline-block h-4 w-4 transform rounded-full bg-white transition-transform",
+                              "inline-block h-4 w-4 shrink-0 transform rounded-full bg-white transition-transform",
                               sendWithEnter ? "translate-x-6" : "translate-x-1"
                             )}
                           />
