@@ -179,10 +179,10 @@ export const CodeRunner: React.FC<CodeRunnerProps> = ({ isOpen, onClose, code, l
                 <button
                   onClick={runCode}
                   className="p-1.5 text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors flex items-center gap-1 text-xs font-medium"
-                  title="Run again"
+                  title={isHtml ? "Refresh" : "Run again"}
                 >
-                  <Play className="w-4 h-4" />
-                  <span className="hidden sm:inline">Run</span>
+                  {isHtml ? <RefreshCw className="w-4 h-4" /> : <Play className="w-4 h-4" />}
+                  <span className="hidden sm:inline">{isHtml ? 'Refresh' : 'Run'}</span>
                 </button>
                 <div className="w-px h-4 bg-white/10 mx-1" />
                 <button

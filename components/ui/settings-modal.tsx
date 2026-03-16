@@ -111,7 +111,6 @@ export function SettingsModal({
     setFontSize('base');
     setIsDark(true);
     setSendWithEnter(true);
-    setAiMemory('');
     setFontFamily('sans');
     setDeveloperMode(false);
     setStreamResponses(true);
@@ -575,6 +574,31 @@ export function SettingsModal({
                             )}
                           />
                         </button>
+                      </div>
+                    </div>
+
+                    <div className="h-px w-full bg-[var(--border-color)]" />
+
+                    {/* AI Memory */}
+                    <div className="space-y-3">
+                      <label className="text-sm font-medium text-[var(--text-primary)] flex items-center gap-2">
+                        <MessageSquare className="w-4 h-4 text-[var(--text-secondary)]" />
+                        Custom Instructions
+                      </label>
+                      <div className="flex flex-col gap-2 p-3 rounded-lg border border-[var(--border-color)] bg-[var(--bg-input)]">
+                        <div>
+                          <div className="text-sm font-medium text-[var(--text-primary)]">AI Memory</div>
+                          <div className="text-xs text-[var(--text-muted)]">Add custom instructions or context for the AI to remember across all chats.</div>
+                        </div>
+                        <textarea
+                          value={aiMemory}
+                          onChange={(e) => {
+                            setAiMemory(e.target.value);
+                            localStorage.setItem('aiMemory', e.target.value);
+                          }}
+                          placeholder="e.g., Always respond in markdown, I am a senior developer, etc."
+                          className="w-full h-24 p-2 text-sm bg-transparent border border-[var(--border-color)] rounded-md outline-none focus:ring-1 focus:ring-[var(--accent-color)] resize-none text-[var(--text-primary)] placeholder:text-[var(--text-muted)]"
+                        />
                       </div>
                     </div>
 

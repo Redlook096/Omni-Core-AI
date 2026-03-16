@@ -205,7 +205,7 @@ export function ChatManagerModal({
               <button
                 onClick={handleExport}
                 disabled={selectedIds.size === 0}
-                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-color)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-white"
+                className="flex items-center gap-2 px-3 py-1.5 bg-[var(--accent-color)] hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg transition-colors text-sm font-medium text-[var(--bg-app)]"
               >
                 <Download className="w-4 h-4" />
                 Export

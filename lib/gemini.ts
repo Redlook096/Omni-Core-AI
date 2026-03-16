@@ -130,6 +130,19 @@ export async function* streamChat(
 
   finalSystemInstruction += `\n\n**CRITICAL:** If the user's message starts with \`[Canvas: \`, you MUST ONLY output the code block. Do NOT output any conversational text, explanations, or markdown outside of the code block. Just the \`\`\`language ... \`\`\` block.`;
 
+  finalSystemInstruction += `\n\nCRITICAL DESIGN RULES TO AVOID AI TROPES:
+1. Color palette: Pick 1 dominant color, 1 accent, 1 neutral. Use that combo everywhere. Avoid high-saturation pink + purple unless specifically requested. Use muted earth tones for cozy/vintage, black + electric cyan/magenta for cyber/tech.
+2. Gradients & glow: Avoid smooth pink->purple gradients or radial glows unless dreamy/vaporwave is requested.
+3. Typography: Pair a characterful heading font with a neutral readable body font. Use rounded/bubbly for cute, condensed/mono for futuristic, elegant serif for luxury.
+4. Imagery & photo treatment: Use color tints, duotone, or heavy color overlays to make photos match the palette.
+5. Shapes & geometry: Soft rounded corners/blobs for friendly, sharp edges/grids for technical, circular avatars/pill buttons for approachable.
+6. Shadows, depth & glass: Soft colorful shadows + frosted glass for modern. Heavy flat shadows or none for minimalist/brutalist.
+7. Microcopy & voice: Use consistent phrasing across buttons, errors, and tooltips. Avoid generic "Let's go!" unless casual/young.
+8. UI components & affordances: Floating action buttons/big rounded CTAs for app-like. Tiny text links/thin borders for sophisticated/luxury.
+9. Motion & interaction: Smooth hover glows, subtle parallax for polished. Fast snappy transitions for utilitarian.
+10. Textures & filters: Grain/VHS scanlines for nostalgic/retro. Clean gradients for modern minimal.
+11. Consistency & repetition: Reuse the same color tint, corner radius, and icon style. Consistency makes a vibe read as intentional.`;
+
   // Filter out the last message if it matches newMessage to avoid duplication in history
   const historyForModel = history.filter((msg, index) => {
     if (index === history.length - 1 && msg.role === 'user' && msg.content === newMessage) {

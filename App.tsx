@@ -1,13 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PromptInputBox } from './components/ui/prompt-input-box';
 import { Dock, DockIcon, DockItem, DockLabel } from './components/ui/dock';
-import { Home, BookOpen, ChevronDown } from 'lucide-react';
+import { Home, ChevronDown } from 'lucide-react';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
 import { streamChat, generateTitle } from './lib/gemini';
 import { t } from './lib/translations';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Download, Code, Zap, BarChart, Bug, Languages } from 'lucide-react';
+import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Download, Code, Zap, BarChart, Bug, Languages, Terminal } from 'lucide-react';
 import { ThemeToggle } from './components/ui/theme-toggle';
 import { FakeTextStory } from './components/ui/fake-text-story';
 import { CreatorsMenu } from './components/ui/creators-menu';
@@ -15,6 +15,7 @@ import { TextShimmer } from './components/ui/text-shimmer';
 import { ChatManagerModal } from './components/ui/chat-manager-modal';
 import { SettingsModal } from './components/ui/settings-modal';
 import { CodeRunner } from './components/ui/code-runner';
+import { VibeCoder } from './components/ui/vibe-coder';
 import { SiriOrb } from './components/SiriOrb';
 import { cn } from './lib/utils';
 
@@ -69,18 +70,18 @@ const itemVariants = {
 };
 
 interface Suggestion {
-  iconName: 'FileText' | 'Lightbulb' | 'MessageSquare' | 'Code' | 'Zap' | 'BarChart' | 'Bug' | 'Languages' | 'SquarePen' | 'Settings';
+  iconName: 'FileText' | 'Lightbulb' | 'MessageSquare' | 'Code' | 'Zap' | 'BarChart' | 'Bug' | 'Languages' | 'SquarePen' | 'Settings' | 'Terminal';
   text: string;
   subtext: string;
   prompt?: string;
   autoSend?: boolean;
-  action?: 'open-runner' | 'open-settings' | 'open-story' | 'toggle-theme' | 'open-chat-manager';
+  action?: 'open-runner' | 'open-settings' | 'open-story' | 'toggle-theme' | 'open-chat-manager' | 'open-vibe-coder';
 }
 
 const SUGGESTIONS_POOL: Suggestion[] = [
   { iconName: 'SquarePen', text: 'Code Playground', subtext: 'Write & run code instantly', action: 'open-runner' },
   { iconName: 'Settings', text: 'App Preferences', subtext: 'Customize your experience', action: 'open-settings' },
-  { iconName: 'MessageSquare', text: 'Immersive Story', subtext: 'Enter story mode', action: 'open-story' },
+  { iconName: 'Terminal', text: 'Vibe Coder', subtext: 'Enter IDE mode', action: 'open-vibe-coder' },
   { iconName: 'Zap', text: 'Toggle Theme', subtext: 'Switch light/dark mode', action: 'toggle-theme' },
   { iconName: 'FileText', text: 'Chat History', subtext: 'Manage past conversations', action: 'open-chat-manager' }
 ];
@@ -109,7 +110,7 @@ const AnimatedMenuIcon = ({ isOpen }: { isOpen: boolean }) => (
 );
 
 export default function App() {
-  const [currentView, setCurrentView] = useState<'chat' | 'creators-menu' | 'story'>('chat');
+  const [currentView, setCurrentView] = useState<'chat' | 'creators-menu' | 'story' | 'vibe-coder'>('chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [hasStarted, setHasStarted] = useState(false);
   const [isDockHovered, setIsDockHovered] = useState(false);
@@ -589,15 +590,17 @@ export default function App() {
     )}>
       
       {/* Global Sidebar Toggle Button */}
-      <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className={cn(
-          "fixed top-[14px] left-[18px] z-[80] p-2 rounded-lg transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0",
-          "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-        )}
-      >
-        <AnimatedMenuIcon isOpen={isSidebarOpen} />
-      </button>
+      {currentView === 'chat' && (
+        <button
+          onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+          className={cn(
+            "fixed top-[14px] left-[18px] z-[80] p-2 rounded-lg transition-colors outline-none focus:outline-none focus-visible:outline-none focus-visible:ring-0",
+            "text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
+          )}
+        >
+          <AnimatedMenuIcon isOpen={isSidebarOpen} />
+        </button>
+      )}
       
       {/* Toast Notification */}
       <AnimatePresence>
@@ -614,7 +617,7 @@ export default function App() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {isSidebarOpen && (
+        {isSidebarOpen && currentView === 'chat' && (
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -628,7 +631,7 @@ export default function App() {
       {/* Left Sidebar */}
       <motion.div
         initial="closed"
-        animate={isSidebarOpen ? "open" : "closed"}
+        animate={isSidebarOpen && currentView === 'chat' ? "open" : "closed"}
         variants={sidebarVariants}
         className="fixed top-0 left-0 bottom-0 w-[260px] bg-[var(--bg-sidebar)] z-[70] flex flex-col border-r border-[var(--border-color)] transition-colors duration-300"
       >
@@ -646,7 +649,7 @@ export default function App() {
           <motion.button 
             variants={itemVariants}
             onClick={handleHomeClick}
-            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors group text-sm text-[var(--text-primary)] h-10 outline-none focus:outline-none"
+            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-xl transition-colors group text-sm text-[var(--text-primary)] h-10 outline-none focus:outline-none"
           >
             <Plus className="w-4 h-4" />
             <span>{t(language, 'newChat')}</span>
@@ -654,7 +657,7 @@ export default function App() {
 
           <motion.div variants={itemVariants} className="relative h-10">
             {isSearchActive ? (
-              <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-input)] rounded-lg border border-[var(--border-color)] h-full">
+              <div className="flex items-center gap-2 px-3 py-2 bg-[var(--bg-input)] rounded-xl border border-[var(--border-color)] h-full">
                 <Search className="w-4 h-4 text-[var(--text-secondary)] shrink-0" />
                 <input
                   ref={searchInputRef}
@@ -672,7 +675,7 @@ export default function App() {
             ) : (
               <button 
                 onClick={() => setIsSearchActive(true)}
-                className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)] h-full"
+                className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-xl transition-colors text-sm text-[var(--text-secondary)] h-full"
               >
                 <Search className="w-4 h-4" />
                 <span>{t(language, 'searchChats')}</span>
@@ -705,7 +708,7 @@ export default function App() {
                   transition={{ duration: 0.2 }}
                   key={session.id}
                   className={cn(
-                    "group relative w-full flex items-center rounded-lg transition-colors overflow-hidden shrink-0",
+                    "group relative w-full flex items-center rounded-xl transition-colors overflow-hidden shrink-0",
                     currentSessionId === session.id ? "bg-[var(--bg-hover)]" : "hover:bg-[var(--bg-hover)]"
                   )}
                 >
@@ -718,7 +721,7 @@ export default function App() {
                       onChange={(e) => setEditTitle(e.target.value)}
                       onBlur={() => saveRename(session.id)}
                       onKeyDown={(e) => e.key === 'Enter' && saveRename(session.id)}
-                      className="bg-[var(--bg-input)] text-[var(--text-primary)] text-sm rounded px-2 py-1 w-full outline-none border border-[var(--border-color)]"
+                      className="bg-[var(--bg-input)] text-[var(--text-primary)] text-sm rounded-lg px-2 py-1 w-full outline-none border border-[var(--border-color)]"
                       autoFocus
                     />
                   </div>
@@ -766,14 +769,14 @@ export default function App() {
         <motion.div variants={itemVariants} className="p-3 border-t border-[var(--border-color)] space-y-1">
           <button 
             onClick={() => setIsChatManagerOpen(true)}
-            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-xl transition-colors text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <Download className="w-4 h-4" />
             <span>Manage Chats</span>
           </button>
           <button 
             onClick={() => setIsSettingsOpen(true)}
-            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-lg transition-colors text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+            className="flex items-center gap-3 w-full px-3 py-2 hover:bg-[var(--bg-hover)] rounded-xl transition-colors text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
           >
             <Settings className="w-4 h-4" />
             <span>{t(language, 'settings')}</span>
@@ -786,7 +789,7 @@ export default function App() {
       <motion.div 
         ref={mainContentRef}
         onScroll={handleScroll}
-        animate={{ paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px" }}
+        animate={{ paddingLeft: isSidebarOpen && !isMobile && currentView === 'chat' ? "260px" : "0px" }}
         transition={SIDEBAR_TRANSITION}
         className="flex-1 w-full flex flex-col items-center relative h-screen overflow-y-auto"
       >
@@ -860,7 +863,7 @@ export default function App() {
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full mt-4">
                       {currentSuggestions.map((suggestion, i) => {
                         const IconComponent = {
-                          FileText, Lightbulb, MessageSquare, Code, Zap, BarChart, Bug, Languages, SquarePen, Settings
+                          FileText, Lightbulb, MessageSquare, Code, Zap, BarChart, Bug, Languages, SquarePen, Settings, Terminal
                         }[suggestion.iconName];
                         
                         return (
@@ -876,6 +879,7 @@ export default function App() {
                                 else if (suggestion.action === 'open-story') setCurrentView('story');
                                 else if (suggestion.action === 'toggle-theme') setIsDark(!isDark);
                                 else if (suggestion.action === 'open-chat-manager') setIsChatManagerOpen(true);
+                                else if (suggestion.action === 'open-vibe-coder') setCurrentView('vibe-coder');
                               } else if (suggestion.prompt) {
                                 if (suggestion.autoSend) {
                                   handleSubmit(suggestion.prompt);
@@ -887,10 +891,10 @@ export default function App() {
                                 }
                               }
                             }}
-                            className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all duration-200 text-left group shadow-sm hover:shadow relative overflow-hidden"
+                            className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all duration-200 text-left group shadow-sm hover:shadow relative overflow-hidden"
                           >
-                            <div className="flex items-center justify-center w-8 h-8 rounded-lg bg-[var(--bg-app)] border border-[var(--border-color)] group-hover:border-indigo-500/30 group-hover:bg-indigo-500/5 transition-colors duration-300 shrink-0">
-                              {IconComponent && <IconComponent className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-indigo-500 transition-colors duration-300" />}
+                            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--bg-app)] border border-[var(--border-color)] group-hover:border-[var(--text-primary)]/20 transition-colors duration-300 shrink-0">
+                              {IconComponent && <IconComponent className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors duration-300" />}
                             </div>
                             <div className="flex flex-col min-w-0">
                               <span className="text-[var(--text-primary)] font-medium text-sm truncate">
@@ -948,6 +952,10 @@ export default function App() {
               if (type === 'story') setCurrentView('story');
             }} />
           </div>
+        ) : currentView === 'vibe-coder' ? (
+          <div className="w-full h-full overflow-hidden">
+            <VibeCoder onBack={() => setCurrentView('chat')} />
+          </div>
         ) : (
           <div className="w-full h-full overflow-hidden pt-14 pb-24 flex items-center justify-center">
             <FakeTextStory onFullscreenChange={setIsStoryFullscreen} />
@@ -962,7 +970,7 @@ export default function App() {
           initial={false}
           animate={{ 
             pointerEvents: isDockHovered ? 'none' : 'auto',
-            paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px",
+            paddingLeft: isSidebarOpen && !isMobile && currentView === 'chat' ? "260px" : "0px",
             opacity: isDockHovered ? 0 : 1
           }}
           transition={SIDEBAR_TRANSITION}
@@ -993,7 +1001,7 @@ export default function App() {
       {/* Dock & Indicator */}
       {!isStoryFullscreen && currentView !== 'creators-menu' && (
         <motion.div 
-          animate={{ paddingLeft: isSidebarOpen && !isMobile ? "260px" : "0px" }}
+          animate={{ paddingLeft: isSidebarOpen && !isMobile && currentView === 'chat' ? "260px" : "0px" }}
           transition={SIDEBAR_TRANSITION}
           className="fixed bottom-0 left-0 w-full h-10 z-[200] pointer-events-none flex flex-col justify-end items-center pb-0"
         >
@@ -1033,21 +1041,12 @@ export default function App() {
                     </DockItem>
                     <DockItem
                       onClick={() => {
-                        setCurrentView('story');
+                        setCurrentView('vibe-coder');
                       }}
                       className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
                     >
-                      <DockLabel>Story</DockLabel>
-                      <DockIcon><BookOpen className='h-full w-full' /></DockIcon>
-                    </DockItem>
-                    <DockItem
-                      onClick={() => {
-                        setIsSettingsOpen(true);
-                      }}
-                      className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
-                    >
-                      <DockLabel>Settings</DockLabel>
-                      <DockIcon><Settings className='h-full w-full' /></DockIcon>
+                      <DockLabel>Vibe Coder</DockLabel>
+                      <DockIcon><Terminal className='h-full w-full' /></DockIcon>
                     </DockItem>
                   </Dock>
                 </motion.div>

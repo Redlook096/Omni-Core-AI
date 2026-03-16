@@ -6,7 +6,8 @@ import {
   Check,
   Search,
   BrainCog,
-  FolderCode
+  FolderCode,
+  RefreshCw
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -73,13 +74,13 @@ const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' |
   return isEnabled ? displayedText : text;
 };
 
-const CodeBlock = ({ code, language }: { code: string, language: string }) => {
+const CodeBlock = ({ code, language, isStreaming }: { code: string, language: string, isStreaming?: boolean }) => {
   const [isEditing, setIsEditing] = React.useState(false);
   const [editedCode, setEditedCode] = React.useState(code);
 
   return (
-    <div className="my-4 rounded-xl bg-[#1e1e1e] border border-white/10 shadow-lg">
-      <div className="flex items-center justify-between px-4 py-2.5 bg-[#2d2d2d] text-xs text-gray-400 sticky top-0 md:top-0 z-20 rounded-t-xl border-b border-white/10">
+    <div className="my-4 rounded-2xl bg-[#1e1e1e] border border-white/10 shadow-lg relative">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-[#1e1e1e] text-xs text-gray-400 sticky top-0 md:top-0 z-20 border-b border-white/5 rounded-t-2xl">
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-200">Code</span>
           <span>·</span>
@@ -158,13 +159,14 @@ const CodeBlock = ({ code, language }: { code: string, language: string }) => {
                 }}
                 className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
               >
-                Run code
+                {isStreaming && <RefreshCw className="w-3 h-3 animate-spin" />}
+                {isStreaming ? 'Running...' : 'Run code'}
               </button>
             </>
           )}
         </div>
       </div>
-      <div className="overflow-x-auto text-sm font-mono text-gray-300 rounded-b-xl custom-scrollbar">
+      <div className="overflow-x-auto text-sm font-mono text-gray-300 rounded-b-2xl custom-scrollbar">
         {isEditing ? (
           <textarea
             value={editedCode}
@@ -239,7 +241,7 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                 const language = match ? match[1] || 'text' : 'text';
                 const code = match ? match[2] : codePart.slice(3, isClosed ? -3 : undefined);
                 
-                return <CodeBlock key={codeIdx} code={code} language={language} />;
+                return <CodeBlock key={codeIdx} code={code} language={language} isStreaming={isStreaming} />;
               }
 
               // Split by headers ***
@@ -427,9 +429,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
               animate={{ opacity: 1 }}
               transition={{ duration: 0.3 }}
               className={cn(
-                "text-[15px] leading-7 md:text-[16px] relative transition-all duration-300",
+                "text-[15px] leading-relaxed relative transition-all duration-300",
                 isUser 
-                  ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3 rounded-2xl rounded-tr-sm max-w-[85vw] md:max-w-[600px]"
+                  ? "bg-[var(--bg-user-message)] text-[var(--text-user-message)] px-5 py-3.5 rounded-[22px] rounded-br-[6px] max-w-[85vw] md:max-w-[600px] shadow-sm border border-[var(--border-color)]"
                   : "text-[var(--text-primary)] px-2 py-4 w-full"
               )}
             >

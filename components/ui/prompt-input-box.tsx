@@ -342,7 +342,7 @@ const PromptInput = React.forwardRef<HTMLDivElement, PromptInputProps>(
           <div
             ref={ref}
             className={cn(
-              "rounded-3xl border border-[var(--border-color)] bg-[var(--bg-input)] p-2 shadow-sm transition-all duration-300 focus-within:ring-1 focus-within:ring-[var(--border-color)]",
+              "rounded-[28px] border border-[var(--border-color)] bg-[var(--bg-input)]/80 backdrop-blur-md p-2 shadow-sm transition-all duration-300 focus-within:ring-1 focus-within:ring-[var(--border-color)]",
               isLoading && "border-[var(--text-muted)]",
               className
             )}
@@ -454,9 +454,11 @@ interface PromptInputBoxProps {
   value?: string;
   onChange?: (value: string) => void;
   language?: string;
+  hideOptions?: boolean;
+  customActions?: React.ReactNode;
 }
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange, language = 'English' } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange, language = 'English', hideOptions = false, customActions } = props;
   const [internalInput, setInternalInput] = React.useState("");
   const input = value !== undefined ? value : internalInput;
   const setInput = (newVal: string) => {
@@ -692,113 +694,116 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                   </button>
                 </PromptInputAction>
 
-                <div className="flex items-center">
-                  <button
-                    type="button"
-                    onClick={() => handleToggleChange("search")}
-                    className={cn(
-                      "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                      showSearch
-                        ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
-                        : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                    )}
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                      <motion.div
-                        animate={{ rotate: showSearch ? 360 : 0, scale: showSearch ? 1.1 : 1 }}
-                        whileHover={{ rotate: showSearch ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
-                        transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                      >
-                        <Globe className={cn("w-4 h-4", showSearch ? "text-[var(--text-primary)]" : "text-inherit")} />
-                      </motion.div>
-                    </div>
-                    <AnimatePresence>
-                      {showSearch && (
-                        <motion.span
-                          initial={{ width: 0, opacity: 0 }}
-                          animate={{ width: "auto", opacity: 1 }}
-                          exit={{ width: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
-                        >
-                          {t(language, 'search')}
-                        </motion.span>
+                {!hideOptions && (
+                  <div className="flex items-center">
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange("search")}
+                      className={cn(
+                        "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                        showSearch
+                          ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
+                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
-                    </AnimatePresence>
-                  </button>
-
-                  <CustomDivider />
-
-                  <button
-                    type="button"
-                    onClick={() => handleToggleChange("think")}
-                    className={cn(
-                      "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                      showThink
-                        ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
-                        : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                    )}
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                      <motion.div
-                        animate={{ rotate: showThink ? 360 : 0, scale: showThink ? 1.1 : 1 }}
-                        whileHover={{ rotate: showThink ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
-                        transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                      >
-                        <BrainCog className={cn("w-4 h-4", showThink ? "text-[var(--text-primary)]" : "text-inherit")} />
-                      </motion.div>
-                    </div>
-                    <AnimatePresence>
-                      {showThink && (
-                        <motion.span
-                          initial={{ width: 0, opacity: 0 }}
-                          animate={{ width: "auto", opacity: 1 }}
-                          exit={{ width: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
+                    >
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        <motion.div
+                          animate={{ rotate: showSearch ? 360 : 0, scale: showSearch ? 1.1 : 1 }}
+                          whileHover={{ rotate: showSearch ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                          transition={{ type: "spring", stiffness: 260, damping: 25 }}
                         >
-                          {t(language, 'think')}
-                        </motion.span>
+                          <Globe className={cn("w-4 h-4", showSearch ? "text-[var(--text-primary)]" : "text-inherit")} />
+                        </motion.div>
+                      </div>
+                      <AnimatePresence>
+                        {showSearch && (
+                          <motion.span
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "auto", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
+                          >
+                            {t(language, 'search')}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+
+                    <CustomDivider />
+
+                    <button
+                      type="button"
+                      onClick={() => handleToggleChange("think")}
+                      className={cn(
+                        "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                        showThink
+                          ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
+                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
-                    </AnimatePresence>
-                  </button>
-
-                  <CustomDivider />
-
-                  <button
-                    type="button"
-                    onClick={handleCanvasToggle}
-                    className={cn(
-                      "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                      showCanvas
-                        ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
-                        : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                    )}
-                  >
-                    <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                      <motion.div
-                        animate={{ rotate: showCanvas ? 360 : 0, scale: showCanvas ? 1.1 : 1 }}
-                        whileHover={{ rotate: showCanvas ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
-                        transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                      >
-                        <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[var(--text-primary)]" : "text-inherit")} />
-                      </motion.div>
-                    </div>
-                    <AnimatePresence>
-                      {showCanvas && (
-                        <motion.span
-                          initial={{ width: 0, opacity: 0 }}
-                          animate={{ width: "auto", opacity: 1 }}
-                          exit={{ width: 0, opacity: 0 }}
-                          transition={{ duration: 0.2 }}
-                          className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
+                    >
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        <motion.div
+                          animate={{ rotate: showThink ? 360 : 0, scale: showThink ? 1.1 : 1 }}
+                          whileHover={{ rotate: showThink ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                          transition={{ type: "spring", stiffness: 260, damping: 25 }}
                         >
-                          {t(language, 'canvas')}
-                        </motion.span>
+                          <BrainCog className={cn("w-4 h-4", showThink ? "text-[var(--text-primary)]" : "text-inherit")} />
+                        </motion.div>
+                      </div>
+                      <AnimatePresence>
+                        {showThink && (
+                          <motion.span
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "auto", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
+                          >
+                            {t(language, 'think')}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+
+                    <CustomDivider />
+
+                    <button
+                      type="button"
+                      onClick={handleCanvasToggle}
+                      className={cn(
+                        "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
+                        showCanvas
+                          ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
+                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
-                    </AnimatePresence>
-                  </button>
-                </div>
+                    >
+                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                        <motion.div
+                          animate={{ rotate: showCanvas ? 360 : 0, scale: showCanvas ? 1.1 : 1 }}
+                          whileHover={{ rotate: showCanvas ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                          transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                        >
+                          <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[var(--text-primary)]" : "text-inherit")} />
+                        </motion.div>
+                      </div>
+                      <AnimatePresence>
+                        {showCanvas && (
+                          <motion.span
+                            initial={{ width: 0, opacity: 0 }}
+                            animate={{ width: "auto", opacity: 1 }}
+                            exit={{ width: 0, opacity: 0 }}
+                            transition={{ duration: 0.2 }}
+                            className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
+                          >
+                            {t(language, 'canvas')}
+                          </motion.span>
+                        )}
+                      </AnimatePresence>
+                    </button>
+                  </div>
+                )}
+                {customActions}
             </>
           </div>
 
