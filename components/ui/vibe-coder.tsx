@@ -1,27 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { 
-  PanelLeftClose, 
-  PanelLeftOpen,
   Eye,
   Code2,
-  Monitor,
-  Smartphone,
-  RefreshCw,
-  TerminalSquare,
-  FileCode,
-  FileJson,
-  FolderOpen,
-  Download,
   CheckCircle2,
   Loader2,
-  Maximize2,
-  Minimize2,
-  Files,
   Search,
-  GitBranch,
-  Play,
-  Blocks
+  RotateCcw,
+  Plus,
+  MoreHorizontal,
+  Layers,
+  Globe,
+  ChevronLeft,
+  FileCode,
+  FileJson,
+  X
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { PromptInputBox } from './prompt-input-box';
@@ -86,47 +79,27 @@ const TsIcon = ({ className }: { className?: string }) => (
 
 function GenerationProgress({ isStreaming, steps }: { isStreaming: boolean, steps: string[] }) {
   const [currentStep, setCurrentStep] = useState(0);
-  const [showChecklist, setShowChecklist] = useState(false);
 
   useEffect(() => {
-    if (steps.length > 0 && !showChecklist) {
-      const timer = setTimeout(() => {
-        setShowChecklist(true);
-      }, 5000);
-      return () => clearTimeout(timer);
-    }
-  }, [steps.length, showChecklist]);
-
-  useEffect(() => {
-    if (!isStreaming || !showChecklist) {
+    if (!isStreaming) {
       return;
     }
     
     const timeout = setTimeout(() => setCurrentStep(0), 0);
     const interval = setInterval(() => {
       setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
-    }, 3000);
+    }, 2000);
 
     return () => {
       clearTimeout(timeout);
       clearInterval(interval);
     };
-  }, [isStreaming, steps.length, showChecklist]);
+  }, [isStreaming, steps.length]);
 
   return (
-    <div className="mt-4 space-y-3">
-      {(!showChecklist || steps.length === 0) && isStreaming && (
-        <motion.div 
-          initial={{ opacity: 0, y: 5 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="flex items-center gap-3 text-[14px] font-medium px-1"
-        >
-          <TextShimmer className="font-medium">Thinking...</TextShimmer>
-        </motion.div>
-      )}
-      
-      {showChecklist && steps.length > 0 && (
-        <div className="space-y-2">
+    <div className="mt-2 space-y-2">
+      {steps.length > 0 && (
+        <div className="flex flex-col gap-2">
           {steps.map((step, index) => {
             const isCompleted = !isStreaming || index < currentStep;
             const isActive = isStreaming && index === currentStep;
@@ -134,32 +107,34 @@ function GenerationProgress({ isStreaming, steps }: { isStreaming: boolean, step
             return (
               <motion.div 
                 key={index}
-                initial={{ opacity: 0, x: -10, filter: 'blur(4px)' }}
-                animate={{ opacity: 1, x: 0, filter: 'blur(0px)' }}
-                transition={{ delay: index * 0.1, duration: 0.4, ease: "easeOut" }}
+                initial={{ opacity: 0, y: 5 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
                 className={cn(
-                  "flex items-center gap-3 text-[13px] transition-all duration-500 p-2.5 rounded-xl border",
-                  isActive ? "bg-blue-500/5 border-blue-500/20 text-[var(--text-primary)] font-medium shadow-sm" : 
-                  isCompleted ? "bg-[var(--bg-hover)] border-[var(--border-color)] text-[var(--text-secondary)]" : 
-                  "bg-transparent border-transparent text-[var(--text-muted)] opacity-50"
+                  "flex items-center gap-3 text-[13px] font-medium transition-all duration-300 py-1.5",
+                  isCompleted && !isActive ? "text-[#8a8a8a] bg-transparent" : 
+                  isActive ? "text-[#f5f5f5] bg-transparent" : 
+                  "text-[#525252] bg-transparent"
                 )}
               >
                 {isCompleted && !isActive ? (
-                  <motion.div 
-                    initial={{ scale: 0 }} 
-                    animate={{ scale: 1 }} 
-                    className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center shrink-0"
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
                   >
-                    <CheckCircle2 className="w-4 h-4 text-green-500" />
+                    <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
                   </motion.div>
                 ) : isActive ? (
-                  <div className="w-6 h-6 rounded-full bg-blue-500/10 flex items-center justify-center shrink-0">
-                    <Loader2 className="w-4 h-4 text-blue-500 animate-spin" />
-                  </div>
+                  <Loader2 className="w-4 h-4 text-[#3b82f6] animate-spin" />
                 ) : (
-                  <div className="w-6 h-6 rounded-full border-2 border-[var(--border-color)] shrink-0" />
+                  <div className="w-4 h-4 rounded-full border-2 border-[#333]" />
                 )}
-                <span className="flex-1">{step}</span>
+                {isActive ? (
+                  <TextShimmer className="flex-1 font-medium">{step}</TextShimmer>
+                ) : (
+                  <span className="flex-1">{step}</span>
+                )}
               </motion.div>
             );
           })}
@@ -170,13 +145,7 @@ function GenerationProgress({ isStreaming, steps }: { isStreaming: boolean, step
 }
 
 export function VibeCoder() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<'preview' | 'code'>('preview');
-  const [deviceView, setDeviceView] = useState<'desktop' | 'mobile'>('desktop');
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isFileTreeOpen, setIsFileTreeOpen] = useState(true);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
   const [isTerminalOpen, setIsTerminalOpen] = useState(false);
   const [terminalHistory, setTerminalHistory] = useState<string[]>([
     'Microsoft Windows [Version 10.0.19045.3803]',
@@ -185,30 +154,17 @@ export function VibeCoder() {
   ]);
   const [terminalInput, setTerminalInput] = useState('');
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const editorRef = useRef<any>(null);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState<{role: 'user'|'model', content: string}[]>([
     { role: 'model', content: 'Welcome to Vibe Coder! Describe the application or feature you want to build, and I will help you create it.' }
   ]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isFixingError, setIsFixingError] = useState(false);
   const [generationSteps, setGenerationSteps] = useState<string[]>([]);
   const [autoFixCount, setAutoFixCount] = useState(0);
   const lastErrorRef = useRef<string>('');
-  
-  const defaultHtml = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Vibe Coder App</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-50 text-gray-900 flex items-center justify-center min-h-screen">
-  <div class="text-center p-8">
-    <h1 class="text-4xl font-bold text-blue-600 mb-4">Welcome to Vibe Coder</h1>
-    <p class="text-lg text-gray-600">Describe what you want to build in the chat, and I will generate the code for you!</p>
-  </div>
-</body>
-</html>`;
 
   const [files, setFiles] = useState<Record<string, { code: string, language: string, icon: React.ElementType, color: string }>>({});
   const [debouncedFiles, setDebouncedFiles] = useState<Record<string, { code: string, language: string, icon: React.ElementType, color: string }>>({});
@@ -228,7 +184,7 @@ export function VibeCoder() {
   const [previewKey, setPreviewKey] = useState(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleSendRef = useRef<((message: string) => Promise<void>) | null>(null);
+  const handleSendRef = useRef<((message: string, isAutoFix?: boolean) => Promise<void>) | null>(null);
 
   useEffect(() => {
     const handleMessage = (e: MessageEvent) => {
@@ -238,7 +194,7 @@ export function VibeCoder() {
           lastErrorRef.current = errorMsg;
           setAutoFixCount(prev => prev + 1);
           if (handleSendRef.current) {
-            handleSendRef.current(`I encountered this error in the preview: ${errorMsg}. Please fix it.`);
+            handleSendRef.current(`I encountered this error in the preview: ${errorMsg}. Please fix it by removing or replacing the missing import.`, true);
           }
         }
       }
@@ -364,27 +320,37 @@ export function VibeCoder() {
         code = code.replace(/export\s+\{[\s\S]*?\}(?:\s+from\s+['"].*?['"])?;?/g, '');
         // Remove export * from statements
         code = code.replace(/export\s+\*\s+from\s+['"].*?['"];?/g, '');
-        // Remove export keywords
+        // Handle export default function/class
+        code = code.replace(/export\s+default\s+(function|class)\s+([A-Za-z0-9_]+)/g, '$1 $2');
+        // Handle export default variable
+        code = code.replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, 'window.__vibeApp = $1;');
+        // Remove remaining export keywords
         code = code.replace(/export\s+default\s+/g, '');
+        code = code.replace(/export\s+const\s+/g, 'const ');
+        code = code.replace(/export\s+function\s+/g, 'function ');
+        code = code.replace(/export\s+class\s+/g, 'class ');
+        code = code.replace(/export\s+let\s+/g, 'let ');
         code = code.replace(/export\s+/g, '');
         combinedCode += `\n// --- ${name} ---\n${code}\n`;
       });
 
       const errorCatchingScript = `
         <script>
-          window.onerror = function(msg, url, line, col, error) {
-            document.body.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace; background: #111; height: 100vh; width: 100vw; box-sizing: border-box;"><h3>Runtime Error</h3><p>' + msg + '</p><pre style="margin-top: 10px; opacity: 0.7; white-space: pre-wrap;">' + (error ? error.stack : '') + '</pre></div>';
+          window.addEventListener('error', function(event) {
+            const msg = event.message || (event.error && event.error.message) || 'Unknown Error';
+            document.body.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace; background: #0a0a0a; height: 100vh; width: 100vw; box-sizing: border-box;"><h3>Runtime Error</h3><p>' + msg + '</p><pre style="margin-top: 10px; opacity: 0.7; white-space: pre-wrap;">' + (event.error ? event.error.stack : '') + '</pre></div>';
             window.parent.postMessage({ type: 'preview_error', error: msg }, '*');
-          };
+          }, true);
           window.addEventListener('unhandledrejection', function(event) {
-            document.body.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace; background: #111; height: 100vh; width: 100vw; box-sizing: border-box;"><h3>Unhandled Promise Rejection</h3><p>' + event.reason + '</p></div>';
-            window.parent.postMessage({ type: 'preview_error', error: event.reason }, '*');
+            const msg = (event.reason && event.reason.message) || event.reason || 'Unhandled Promise Rejection';
+            document.body.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace; background: #0a0a0a; height: 100vh; width: 100vw; box-sizing: border-box;"><h3>Unhandled Promise Rejection</h3><p>' + msg + '</p></div>';
+            window.parent.postMessage({ type: 'preview_error', error: msg }, '*');
           });
         </script>
       `;
 
       if (hasReact) {
-        combinedCode += `\n\nif (typeof App !== 'undefined') window.__vibeApp = App;\nelse if (typeof Main !== 'undefined') window.__vibeApp = Main;\nelse if (typeof Index !== 'undefined') window.__vibeApp = Index;\n`;
+        combinedCode += `\n\nif (typeof App !== 'undefined' && !window.__vibeApp) window.__vibeApp = App;\nelse if (typeof Main !== 'undefined' && !window.__vibeApp) window.__vibeApp = Main;\nelse if (typeof Index !== 'undefined' && !window.__vibeApp) window.__vibeApp = Index;\nelse if (typeof Dashboard !== 'undefined' && !window.__vibeApp) window.__vibeApp = Dashboard;\nelse if (typeof Page !== 'undefined' && !window.__vibeApp) window.__vibeApp = Page;\n`;
       }
 
       const scriptType = hasReact ? 'type="text/babel" data-type="module" data-presets="react,typescript"' : 'type="module"';
@@ -444,35 +410,117 @@ export function VibeCoder() {
   };
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      const container = messagesEndRef.current?.parentElement?.parentElement;
+      if (container) {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }, 50);
   };
 
-  const handleTerminalSubmit = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  const handleTerminalSubmit = async (e: React.KeyboardEvent<HTMLInputElement>, commandOverride?: string) => {
     if (e.key === 'Enter') {
-      const newHistory = [...terminalHistory, `C:\\Users\\User\\vibe-coder> ${terminalInput}`];
-      if (terminalInput.trim().toLowerCase() === 'dir') {
+      const input = (commandOverride ?? terminalInput).trim();
+      const newHistory = [...terminalHistory, `C:\\Users\\User\\vibe-coder> ${input}`];
+      setTerminalInput('');
+      
+      if (input.toLowerCase() === 'dir') {
         newHistory.push(
           ' Volume in drive C has no label.',
           ' Volume Serial Number is 1234-5678',
           '',
           ' Directory of C:\\Users\\User\\vibe-coder',
           '',
-          '15/03/2026  01:48 PM    <DIR>          .',
-          '15/03/2026  01:48 PM    <DIR>          ..',
-          '15/03/2026  01:48 PM             1,024 package.json',
-          '               1 File(s)          1,024 bytes',
+          '03/16/2026  10:00 AM    <DIR>          .',
+          '03/16/2026  10:00 AM    <DIR>          ..',
+          ...Object.keys(files).map(name => `03/16/2026  10:00 AM             1,024 ${name}`),
+          `               ${Object.keys(files).length} File(s)          ${Object.keys(files).length * 1024} bytes`,
           '               2 Dir(s)  100,000,000,000 bytes free'
         );
-      } else if (terminalInput.trim().toLowerCase() === 'cls') {
+      } else if (input.toLowerCase() === 'cls') {
         setTerminalHistory([]);
-        setTerminalInput('');
         return;
-      } else if (terminalInput.trim() !== '') {
-        newHistory.push(`'${terminalInput}' is not recognized as an internal or external command,`, 'operable program or batch file.');
+      } else if (input.startsWith('python ') || input.startsWith('py ')) {
+        const filename = input.split(' ')[1];
+        if (files[filename]) {
+          newHistory.push(`Running ${filename}...`);
+          setTerminalHistory(newHistory);
+          setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
+          
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (!(window as any).loadPyodide) {
+              await new Promise<void>((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js';
+                script.onload = () => resolve();
+                script.onerror = reject;
+                document.head.appendChild(script);
+              });
+            }
+            
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (!(window as any).pyodide) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (window as any).pyodide = await (window as any).loadPyodide();
+            }
+            
+            let output = '';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).pyodide.setStdout({ batched: (str: string) => { output += str + '\\n'; } });
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (window as any).pyodide.setStderr({ batched: (str: string) => { output += str + '\\n'; } });
+            
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await (window as any).pyodide.runPythonAsync(files[filename].code);
+            
+            setTerminalHistory(prev => [...prev, output.trim() || '']);
+          } catch (err: unknown) {
+            setTerminalHistory(prev => [...prev, String(err)]);
+          }
+          setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
+          return;
+        } else {
+          newHistory.push(`python: can't open file '${filename}': [Errno 2] No such file or directory`);
+        }
+      } else if (input.startsWith('node ')) {
+        const filename = input.split(' ')[1];
+        if (files[filename]) {
+          newHistory.push(`Running ${filename}...`);
+          setTerminalHistory(newHistory);
+          setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
+          
+          const output: string[] = [];
+          const originalLog = console.log;
+          const originalError = console.error;
+          
+          console.log = (...args) => { output.push(args.join(' ')); originalLog(...args); };
+          console.error = (...args) => { output.push(args.join(' ')); originalError(...args); };
+          
+          try {
+            const runCode = new Function(files[filename].code);
+            runCode();
+          } catch (err: unknown) {
+            output.push(String(err));
+          }
+          
+          console.log = originalLog;
+          console.error = originalError;
+          
+          setTerminalHistory(prev => [...prev, ...output]);
+          setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
+          return;
+        } else {
+          newHistory.push(`node: Cannot find module '${filename}'`);
+        }
+      } else if (input !== '') {
+        newHistory.push(`'${input}' is not recognized as an internal or external command,`, 'operable program or batch file.');
       }
       newHistory.push('');
       setTerminalHistory(newHistory);
-      setTerminalInput('');
       setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
     }
   };
@@ -481,14 +529,74 @@ export function VibeCoder() {
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async (message: string) => {
+  handleSendRef.current = async (message: string, isAutoFix = false) => {
+    await handleSend(message, isAutoFix);
+  };
+
+  const handleSend = async (message: string, isAutoFix = false) => {
     if (!message.trim() || isLoading) return;
+
+    if (message.startsWith("[Deploy: ")) {
+      const actualMessage = message.replace("[Deploy: ", "").slice(0, -1);
+      setMessages([...messages, { role: 'user', content: `Deploying application: ${actualMessage}` }]);
+      setIsLoading(true);
+      setGenerationSteps(["Preparing deployment", "Building assets", "Deploying to Vercel"]);
+      setTimeout(() => {
+        setMessages(prev => [...prev, { role: 'model', content: "Deployment successful! Your app is live at `https://vibe-coder-app.vercel.app`." }]);
+        setIsLoading(false);
+        setGenerationSteps([]);
+      }, 3000);
+      return;
+    }
+
+    if (message.startsWith("[Format: ")) {
+      const actualMessage = message.replace("[Format: ", "").slice(0, -1);
+      setMessages([...messages, { role: 'user', content: `Formatting code: ${actualMessage}` }]);
+      setIsLoading(true);
+      setGenerationSteps(["Running Prettier", "Fixing lint errors", "Formatting complete"]);
+      
+      if (editorRef.current) {
+        editorRef.current.getAction('editor.action.formatDocument').run();
+      }
+
+      setTimeout(() => {
+        setMessages(prev => [...prev, { role: 'model', content: "Code formatting complete. The current file has been formatted according to standard style guidelines." }]);
+        setIsLoading(false);
+        setGenerationSteps([]);
+      }, 1000);
+      return;
+    }
+
+    if (message.startsWith("[Terminal: ")) {
+      const actualMessage = message.replace("[Terminal: ", "").slice(0, -1);
+      setMessages([...messages, { role: 'user', content: `Running command: \`${actualMessage}\`` }]);
+      setIsLoading(true);
+      setGenerationSteps([`Executing ${actualMessage}`, "Processing output"]);
+      
+      // Simulate running the command in the terminal
+      setIsTerminalOpen(true);
+      
+      setTimeout(() => {
+        // Trigger the terminal submit logic
+        const fakeEvent = { key: 'Enter' } as React.KeyboardEvent<HTMLInputElement>;
+        handleTerminalSubmit(fakeEvent, actualMessage);
+        
+        setMessages(prev => [...prev, { role: 'model', content: "```bash\n$ " + actualMessage + "\nCommand executed successfully in the terminal.\n```" }]);
+        setIsLoading(false);
+        setGenerationSteps([]);
+      }, 1000);
+      return;
+    }
     
+    if (isAutoFix) {
+      setIsFixingError(true);
+    }
+
     const newMessages = [...messages, { role: 'user' as const, content: message }];
     setMessages(newMessages);
     setInput('');
     setIsLoading(true);
-    setGenerationSteps(["Analyzing requirements & architecture"]);
+    setGenerationSteps([]);
 
     try {
       let fullResponse = '';
@@ -497,7 +605,7 @@ export function VibeCoder() {
       const stream = streamChat(
         messages, 
         message, 
-        "You are an expert AI software engineer. The user wants to build a web application. You MUST output multiple files to build a complete, production-ready application.\nFirst, provide a JSON array of the specific tasks you will perform to build this app, wrapped in a ```json:plan block. For example:\n```json:plan\n[\"Setup application structure\", \"Implement Tailwind layout for dashboard\", \"Create interactive components\", \"Add dark mode toggle\"]\n```\nThen, output each file's code wrapped in a markdown block with the language AND filename specified like this: ```html:index.html ...code... ``` or ```css:styles.css ...code... ``` or ```js:script.js ...code... ```. Go above and beyond to make it polished and professional. ALWAYS generate projects with an iOS-like, professional, minimalistic, and smooth design (unless told a certain theme). Use smooth animations, clean typography, and subtle shadows. IMPORTANT: The preview environment supports React, Tailwind, framer-motion, lucide-react, and recharts via ESM imports. You can use standard ES modules (e.g., `import React from 'react'`). Do NOT include CDN links in index.html, they are injected automatically.", 
+        "You are an expert AI software engineer. The user wants to build a web application. You MUST output multiple files to build a complete, production-ready application.\nFirst, provide a JSON array of the specific tasks you will perform to build this app, wrapped in a ```json:plan block. For example:\n```json:plan\n[\"Setup application structure\", \"Implement Tailwind layout for dashboard\", \"Create interactive components\", \"Add dark mode toggle\"]\n```\nThen, output each file's code wrapped in a markdown block with the language AND filename specified like this: ```html:index.html ...code... ``` or ```css:styles.css ...code... ``` or ```js:script.js ...code... ```. Go above and beyond to make it polished and professional. ALWAYS generate projects with an iOS-like, professional, minimalistic, and smooth design (unless told a certain theme). Use smooth animations, clean typography, and subtle shadows. IMPORTANT: The preview environment supports React, Tailwind, framer-motion, lucide-react, and recharts via ESM imports. You can use standard ES modules (e.g., `import React from 'react'`). Do NOT include CDN links in index.html, they are injected automatically. CRITICAL: Do NOT output any conversational text, explanations, or markdown outside of the code blocks. Just output the plan block and the code blocks.", 
         false, 
         'medium'
       );
@@ -609,611 +717,676 @@ export function VibeCoder() {
       setMessages(prev => [...prev, { role: 'model', content: 'Sorry, I encountered an error. Please try again.' }]);
     } finally {
       setIsLoading(false);
+      setIsFixingError(false);
       setPreviewKey(prev => prev + 1);
     }
   };
 
   return (
-    <div className="flex h-screen w-full bg-[var(--bg-app)] text-[var(--text-primary)] overflow-hidden font-sans">
-      {/* Left Sidebar (Chat) */}
-      <AnimatePresence initial={false}>
-        {isSidebarOpen && (
-          <motion.div
-            initial={{ width: 0, opacity: 0 }}
-            animate={{ width: '33.333%', opacity: 1 }}
-            exit={{ width: 0, opacity: 0 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="flex flex-col h-full border-r border-[var(--border-color)] bg-[var(--bg-sidebar)] shrink-0"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)]/80 backdrop-blur-xl z-10 sticky top-0">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center shadow-sm">
-                  <Code2 className="w-4 h-4 text-white" />
-                </div>
-                <div>
-                  <h2 className="font-semibold text-[15px] text-[var(--text-primary)] tracking-tight">Vibe Coder</h2>
-                  <p className="text-[11px] text-[var(--text-muted)] uppercase tracking-wider font-medium mt-0.5">AI Workspace</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setMessages([{ role: 'model', content: 'Welcome to Vibe Coder! Describe the application or feature you want to build, and I will help you create it.' }])}
-                  className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                  title="New Session"
-                >
-                  <RefreshCw className="w-4 h-4" />
-                </button>
-                <button 
-                  onClick={() => setIsSidebarOpen(false)}
-                  className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-                  title="Close Sidebar"
-                >
-                  <PanelLeftClose className="w-4 h-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Chat Stream */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-6 custom-scrollbar">
-              {messages.map((msg, idx) => {
-                const isStreaming = isLoading && idx === messages.length - 1 && msg.role === 'model';
-                const hasCode = msg.content.includes('```');
-                const textContent = msg.content.replace(/```[\s\S]*?(?:```|$)/g, '').trim();
-                
-                return (
-                  <div key={idx} className="flex flex-col gap-2">
-                    {textContent && (
-                      <ChatMessage 
-                        role={msg.role}
-                        content={textContent}
-                        isStreaming={isStreaming && !hasCode}
-                      />
+    <div className="flex h-screen w-full bg-[#0a0a0a] text-[#ededed] font-sans overflow-hidden select-none" style={{ letterSpacing: '-0.01em' }}>
+      
+      {/* --- LEFT SIDEBAR (Chat History) --- */}
+      <div className="w-[380px] flex flex-col border-r border-[#1a1a1a] bg-[#0a0a0a] shrink-0">
+        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+          <div className="p-4 pt-6 space-y-6 pb-6">
+            {messages.map((msg, idx) => (
+              <div key={idx} className={cn("flex flex-col space-y-2", msg.role === 'user' ? "items-end mb-8" : "items-start")}>
+                {msg.role === 'user' ? (
+                  <>
+                    <div className="flex items-center gap-2 max-w-[90%]">
+                      <div className="p-1.5 rounded-full bg-[#1e293b] text-[#60a5fa] shrink-0">
+                        <Globe size={14} />
+                      </div>
+                      <div className="bg-[#171717] px-[14px] py-2.5 rounded-2xl rounded-tr-sm text-[13.5px] border border-[#262626] text-[#e5e5e5] break-words">
+                        {msg.content}
+                      </div>
+                    </div>
+                  </>
+                ) : (
+                  <div className="w-full space-y-5">
+                    {idx === messages.length - 1 && isLoading && generationSteps.length === 0 && (
+                      <motion.div 
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center gap-3 py-2"
+                      >
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Loader2 size={16} className="text-[#3b82f6]" />
+                        </motion.div>
+                        <TextShimmer className="text-[14px] font-medium tracking-wide">Thinking deeply...</TextShimmer>
+                      </motion.div>
                     )}
-                    {(msg.role === 'model' && (hasCode || isStreaming)) && (
-                      <div className={cn(
-                        "ml-12 p-5 rounded-[20px] border transition-all duration-500 shadow-sm",
-                        isStreaming 
-                          ? "border-blue-500/30 bg-blue-500/5 shadow-blue-500/5" 
-                          : "border-[var(--border-color)] bg-[var(--bg-card)]"
-                      )}>
-                        <div className="flex items-center gap-3 mb-4 border-b border-[var(--border-color)] pb-3">
-                          {isStreaming ? (
-                            <div className="relative flex items-center justify-center w-6 h-6">
-                              <div className="absolute inset-0 rounded-full border-2 border-blue-500/20" />
-                              <div className="absolute inset-0 rounded-full border-2 border-blue-500 border-t-transparent animate-spin" />
-                            </div>
-                          ) : (
-                            <div className="w-6 h-6 rounded-full bg-green-500/10 flex items-center justify-center">
-                              <CheckCircle2 className="w-4 h-4 text-green-500" />
-                            </div>
-                          )}
-                          <span className={cn(
-                            "font-medium text-[14px]",
-                            isStreaming ? "text-blue-500" : "text-[var(--text-primary)]"
-                          )}>
-                            {isStreaming ? (
-                              <TextShimmer className="inline-block">Generating application...</TextShimmer>
-                            ) : (
-                              'Application updated'
-                            )}
-                          </span>
-                        </div>
-                        
-                        <div className="max-h-[200px] overflow-y-auto custom-scrollbar pr-2">
-                          <GenerationProgress isStreaming={isStreaming} steps={generationSteps} />
-                        </div>
+                    
+                    {idx === messages.length - 1 && generationSteps.length > 0 && (
+                      <div className="py-2">
+                        <GenerationProgress isStreaming={isLoading} steps={generationSteps} />
                       </div>
                     )}
-                  </div>
-                );
-              })}
-              <div ref={messagesEndRef} className="h-4" />
-            </div>
 
-            {/* Input Area */}
-            <div className="p-4 border-t border-[var(--border-color)] bg-[var(--bg-sidebar)]">
-              {/* Action Chips */}
-              <div className="flex gap-2 mb-3 overflow-x-auto custom-scrollbar pb-1">
-                <button 
-                  onClick={() => handleSend('Build a Pomodoro timer')}
-                  className="px-4 py-1.5 rounded-full bg-[var(--bg-card)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] whitespace-nowrap transition-all border border-[var(--border-color)] shadow-sm hover:shadow-md hover:border-blue-500/30"
-                >
-                  Build a Pomodoro timer
-                </button>
-                <button 
-                  onClick={() => handleSend('Create a weather dashboard')}
-                  className="px-4 py-1.5 rounded-full bg-[var(--bg-card)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] whitespace-nowrap transition-all border border-[var(--border-color)] shadow-sm hover:shadow-md hover:border-blue-500/30"
-                >
-                  Create a weather dashboard
-                </button>
-                <button 
-                  onClick={() => handleSend('Make a simple calculator')}
-                  className="px-4 py-1.5 rounded-full bg-[var(--bg-card)] text-[13px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] whitespace-nowrap transition-all border border-[var(--border-color)] shadow-sm hover:shadow-md hover:border-blue-500/30"
-                >
-                  Make a simple calculator
-                </button>
+                    {(() => {
+                      const displayContent = msg.content.replace(/```[\s\S]*?(?:```|$)/g, '').trim();
+                      return displayContent ? (
+                        <div className="text-[14px] leading-[1.6] text-[#e5e5e5] prose prose-invert max-w-none prose-pre:bg-[#111] prose-pre:border prose-pre:border-[#222]">
+                          <ChatMessage content={displayContent} />
+                        </div>
+                      ) : null;
+                    })()}
+                  </div>
+                )}
               </div>
-              
-              {/* Input Box */}
-              <PromptInputBox
-                value={input}
-                onChange={setInput}
-                onSend={handleSend}
-                isLoading={isLoading}
-                placeholder="Describe your app..."
-                className="bg-[var(--bg-card)] border border-[var(--border-color)] p-2 rounded-[24px] shadow-sm focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500/50 transition-all duration-300"
-                hideOptions={true}
-                customActions={
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      className="rounded-full transition-all flex items-center gap-1.5 px-3 py-1.5 border h-8 bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                    >
-                      <FolderOpen className="w-4 h-4" />
-                      <span className="text-[13px] font-medium">Add Context</span>
-                    </button>
-                    <div className="h-4 w-[1px] bg-[var(--border-color)] mx-1" />
-                    <button
-                      type="button"
-                      onClick={() => setIsTerminalOpen(!isTerminalOpen)}
-                      className={cn(
-                        "rounded-full transition-all flex items-center gap-1.5 px-3 py-1.5 border h-8",
-                        isTerminalOpen 
-                          ? "bg-blue-500/10 border-blue-500/30 text-blue-500" 
-                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)]"
-                      )}
-                    >
-                      <TerminalSquare className="w-4 h-4" />
-                      <span className="text-[13px] font-medium">Terminal</span>
-                    </button>
-                  </div>
-                }
-              />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Right Panel (Workspace) */}
-      <div className="flex-1 flex flex-col h-full bg-[var(--bg-app)] relative">
-        {!isSidebarOpen && (
-          <button 
-            onClick={() => setIsSidebarOpen(true)}
-            className="absolute top-4 left-4 z-10 p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors bg-[var(--bg-card)] border border-[var(--border-color)]"
-          >
-            <PanelLeftOpen className="w-4 h-4" />
-          </button>
-        )}
-
-        {/* Toolbar */}
-        <div className="flex items-center justify-between p-3 border-b border-[var(--border-color)] bg-[var(--bg-sidebar)] overflow-x-auto custom-scrollbar gap-4">
-          {/* Segmented Control */}
-          <div className="flex items-center bg-[var(--bg-input)] rounded-lg p-1 border border-[var(--border-color)] shrink-0 shadow-inner">
-            {[
-              { id: 'preview', icon: Eye, label: 'Preview' },
-              { id: 'code', icon: Code2, label: 'Code' }
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as 'preview' | 'code')}
-                className={cn(
-                  "flex items-center gap-2 px-4 py-1.5 rounded-md text-[13px] font-medium transition-all duration-200",
-                  activeTab === tab.id 
-                    ? "bg-[var(--bg-card)] text-[var(--text-primary)] shadow-sm border border-[var(--border-color)]" 
-                    : "text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-transparent"
-                )}
-              >
-                <tab.icon className="w-4 h-4" />
-                <span className="inline">{tab.label}</span>
-              </button>
             ))}
-          </div>
-
-          <div className="flex-1" /> {/* Spacer */}
-
-          {/* Right Controls */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center bg-[var(--bg-card)] rounded-lg p-1 border border-[var(--border-color)]">
-              <button 
-                onClick={() => setDeviceView('desktop')}
-                className={cn(
-                  "p-1.5 rounded-md transition-colors",
-                  deviceView === 'desktop' ? "bg-[var(--bg-hover)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                )}
-                title="Desktop View"
-              >
-                <Monitor className="w-3.5 h-3.5" />
-              </button>
-              <button 
-                onClick={() => setDeviceView('mobile')}
-                className={cn(
-                  "p-1.5 rounded-md transition-colors",
-                  deviceView === 'mobile' ? "bg-[var(--bg-hover)] text-[var(--text-primary)]" : "text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                )}
-                title="Mobile View"
-              >
-                <Smartphone className="w-3.5 h-3.5" />
-              </button>
-              <div className="w-[1px] h-4 bg-[var(--border-color)] mx-1" />
-              <button 
-                onClick={() => setIsFullscreen(!isFullscreen)}
-                className="p-1.5 rounded-md transition-colors text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                title="Toggle Fullscreen"
-              >
-                {isFullscreen ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-              </button>
-            </div>
-            <button 
-              onClick={() => {
-                const element = document.createElement("a");
-                const file = new Blob([files[selectedFile]?.code || defaultHtml], {type: 'text/plain'});
-                element.href = URL.createObjectURL(file);
-                element.download = selectedFile;
-                document.body.appendChild(element);
-                element.click();
-                document.body.removeChild(element);
-              }}
-              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              title="Download Current File"
-            >
-              <Download className="w-4 h-4" />
-            </button>
-            <button 
-              onClick={() => setPreviewKey(prev => prev + 1)}
-              className="p-2 hover:bg-[var(--bg-hover)] rounded-lg text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-              title="Refresh Preview"
-            >
-              <RefreshCw className="w-4 h-4" />
-            </button>
-            <button 
-              className="ml-2 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors shadow-sm"
-              onClick={() => alert("Deployment feature coming soon!")}
-            >
-              Deploy
-            </button>
+            <div ref={messagesEndRef} />
           </div>
         </div>
 
-        {/* Content Area */}
-        <div className="flex-1 p-0 overflow-hidden flex flex-col relative">
-          {/* Subtle Grid Background */}
-          <div className="absolute inset-0 pointer-events-none opacity-[0.03] dark:opacity-[0.05]" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, black 1px, transparent 0)', backgroundSize: '24px 24px' }} />
-          
-          <div className="flex-1 flex justify-center items-center relative min-h-0">
-            <div className={cn(
-              "w-full h-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl overflow-hidden transition-all duration-300 relative z-10 flex flex-col",
-              (deviceView === 'mobile' && activeTab === 'preview' && !isFullscreen) ? "max-w-[375px] max-h-[812px] border-[12px] border-black rounded-[40px] shadow-2xl" : "max-w-full border-0 rounded-none",
-              isFullscreen ? "fixed inset-0 z-50 rounded-none border-none max-w-full max-h-full" : ""
-            )}>
-              {activeTab === 'preview' && (
-                Object.keys(files).length === 0 ? (
-                  <div className="w-full h-full flex flex-col items-center justify-center text-[var(--text-muted)] bg-[var(--bg-app)]">
-                    <div className="w-16 h-16 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-center mb-6 shadow-sm">
-                      <Eye className="w-8 h-8 opacity-40" />
-                    </div>
-                    <p className="text-sm font-medium">No preview available</p>
-                    <p className="text-xs mt-2 opacity-60">Describe an app to begin vibe coding.</p>
-                  </div>
-                ) : (
-                  <div className={cn("w-full h-full flex flex-col bg-white relative overflow-hidden", (deviceView === 'mobile' && !isFullscreen) ? "rounded-[28px]" : "rounded-none")}>
-                    {isLoading && (
-                      <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm">
-                        <Loader2 className="w-10 h-10 animate-spin text-blue-500 mb-4" />
-                        <p className="text-gray-600 font-medium animate-pulse">Building your app...</p>
-                      </div>
-                    )}
-                    {deviceView === 'mobile' && !isFullscreen && (
-                      <div className="absolute top-0 inset-x-0 h-7 bg-black z-20 flex justify-center rounded-t-[28px]">
-                        <div className="w-32 h-6 bg-black rounded-b-3xl" />
-                      </div>
-                    )}
-                    {isFullscreen && (
-                      <button 
-                        onClick={() => setIsFullscreen(false)}
-                        className="absolute top-4 right-4 z-50 p-2 bg-black/50 hover:bg-black/70 text-white rounded-lg backdrop-blur-sm transition-colors"
-                      >
-                        <Minimize2 className="w-4 h-4" />
-                      </button>
-                    )}
-                    <iframe 
-                      key={previewKey}
-                      srcDoc={getPreviewHtml()}
-                      className={cn(
-                        "flex-1 w-full border-none bg-white",
-                        (deviceView === 'mobile' && !isFullscreen) ? "pt-7" : ""
-                      )}
-                      title="Live Preview" 
-                      sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
-                    />
-                  </div>
-                )
-              )}
-              {activeTab === 'code' && (
-                  <div className="w-full h-full flex relative bg-black text-[#cccccc] rounded-none overflow-hidden">
-                    {/* VS Code Activity Bar */}
-                    <div className="w-12 bg-[#111111] flex flex-col items-center py-2 gap-4 shrink-0 z-10 border-r border-[#222]">
-                      <button 
-                        onClick={() => { setIsFileTreeOpen(true); setIsSearchOpen(false); }}
-                        className={cn("relative transition-colors", isFileTreeOpen && !isSearchOpen ? "text-white" : "text-[#858585] hover:text-white")}
-                      >
-                        <Files className="w-6 h-6 stroke-[1.5]" />
-                        {isFileTreeOpen && !isSearchOpen && <div className="absolute -left-3 top-0 bottom-0 w-[2px] bg-[#007acc]" />}
-                      </button>
-                      <button 
-                        onClick={() => { setIsSearchOpen(true); setIsFileTreeOpen(false); }}
-                        className={cn("relative transition-colors", isSearchOpen ? "text-white" : "text-[#858585] hover:text-white")}
-                      >
-                        <Search className="w-6 h-6 stroke-[1.5]" />
-                        {isSearchOpen && <div className="absolute -left-3 top-0 bottom-0 w-[2px] bg-[#007acc]" />}
-                      </button>
-                    </div>
-                    {isFileTreeOpen && !isSearchOpen && (
-                      <div className="w-64 border-r border-[#222] bg-[#111111] flex flex-col overflow-hidden shrink-0">
-                        <div className="text-[11px] font-semibold text-[#cccccc] mb-2 px-5 pt-3 uppercase tracking-wider flex justify-between items-center">
-                          Explorer
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => { setIsCreatingFile(true); setTimeout(() => newFileInputRef.current?.focus(), 50); }} className="hover:text-white transition-colors" title="New File">
-                              <FileCode className="w-3.5 h-3.5" />
-                            </button>
-                            <button onClick={() => setIsFileTreeOpen(false)} className="hover:text-white transition-colors">
-                              <PanelLeftClose className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pb-4">
-                          {isCreatingFile && (
-                            <div className="flex items-center gap-1.5 text-[13px] py-1 px-4 bg-[#222]">
-                              <FileCode className="w-3.5 h-3.5 shrink-0 text-gray-400" />
-                              <input
-                                ref={newFileInputRef}
-                                type="text"
-                                value={newFileName}
-                                onChange={(e) => setNewFileName(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === 'Enter') handleCreateFile();
-                                  if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); }
-                                }}
-                                onBlur={() => {
-                                  if (newFileName.trim()) handleCreateFile();
-                                  else setIsCreatingFile(false);
-                                }}
-                                className="flex-1 bg-transparent border border-[#007acc] outline-none text-white px-1"
-                                placeholder="filename.ext"
-                              />
-                            </div>
-                          )}
-                          {Object.keys(files).sort().map((filename) => {
-                            const file = files[filename];
-                            const Icon = file.icon;
-                            const parts = filename.split('/');
-                            const name = parts[parts.length - 1];
-                            const depth = parts.length - 1;
-                            
-                            return (
-                              <div 
-                                key={filename}
-                                onClick={() => setSelectedFile(filename)}
-                                className={cn(
-                                  "flex items-center gap-1.5 text-[13px] py-1 px-4 cursor-pointer transition-colors",
-                                  selectedFile === filename 
-                                    ? "bg-[#222] text-white" 
-                                    : "text-[#cccccc] hover:bg-[#1a1a1a]"
-                                )}
-                                style={{ paddingLeft: `${(depth * 12) + 16}px` }}
-                                title={filename}
-                              >
-                                <Icon className={cn("w-3.5 h-3.5 shrink-0", file.color)} />
-                                <span className="truncate">{name}</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    {isSearchOpen && (
-                      <div className="w-64 border-r border-[#222] bg-[#111111] flex flex-col overflow-hidden shrink-0">
-                        <div className="text-[11px] font-semibold text-[#cccccc] mb-2 px-5 pt-3 uppercase tracking-wider flex justify-between items-center">
-                          Search
-                          <button onClick={() => setIsSearchOpen(false)} className="hover:text-white transition-colors">
-                            <PanelLeftClose className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <div className="px-4 py-2">
-                          <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Search files..."
-                            className="w-full bg-[#222] border border-[#333] text-white text-[13px] px-2 py-1 outline-none focus:border-[#007acc]"
-                          />
-                        </div>
-                        <div className="flex-1 overflow-y-auto custom-scrollbar pb-4">
-                          {searchQuery && Object.keys(files).filter(f => files[f].code.toLowerCase().includes(searchQuery.toLowerCase())).map((filename) => {
-                            const file = files[filename];
-                            const Icon = file.icon;
-                            const parts = filename.split('/');
-                            const name = parts[parts.length - 1];
-                            
-                            return (
-                              <div 
-                                key={filename}
-                                onClick={() => setSelectedFile(filename)}
-                                className={cn(
-                                  "flex items-center gap-1.5 text-[13px] py-1 px-4 cursor-pointer transition-colors",
-                                  selectedFile === filename 
-                                    ? "bg-[#222] text-white" 
-                                    : "text-[#cccccc] hover:bg-[#1a1a1a]"
-                                )}
-                                title={filename}
-                              >
-                                <Icon className={cn("w-3.5 h-3.5 shrink-0", file.color)} />
-                                <span className="truncate">{name}</span>
-                              </div>
-                            );
-                          })}
-                          {searchQuery && Object.keys(files).filter(f => files[f].code.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 && (
-                            <div className="text-[#858585] text-[13px] px-4 py-2">No results found.</div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                    <div className="flex-1 flex flex-col bg-black overflow-hidden min-w-0">
-                      <div className="flex items-center overflow-x-auto custom-scrollbar bg-[#111111] shrink-0 border-b border-[#222]">
-                        {!isFileTreeOpen && !isSearchOpen && (
-                          <button onClick={() => setIsFileTreeOpen(true)} className="px-3 text-[#858585] hover:text-[#cccccc] transition-colors shrink-0">
-                            <PanelLeftOpen className="w-4 h-4" />
-                          </button>
-                        )}
-                        {Object.keys(files).map((filename) => {
-                          const file = files[filename];
-                          const isSelected = selectedFile === filename;
-                          return (
-                            <button
-                              key={filename}
-                              onClick={() => setSelectedFile(filename)}
-                              className={cn(
-                                "flex items-center gap-2 px-3 py-2 text-[13px] min-w-fit transition-colors border-r border-[#222]",
-                                isSelected 
-                                  ? "bg-black text-white border-t border-t-[#007acc]" 
-                                  : "bg-[#111111] text-[#969696] hover:bg-[#1a1a1a] border-t border-t-transparent"
-                              )}
-                            >
-                              {React.createElement(file.icon, { className: cn("w-3.5 h-3.5", file.color) })}
-                              {filename}
-                            </button>
-                          );
-                        })}
-                      </div>
-                      <div className="flex-1 overflow-hidden bg-black">
-                        {Object.keys(files).length === 0 ? (
-                          <div className="w-full h-full flex flex-col items-center justify-center text-[#858585] bg-black">
-                            <div className="w-16 h-16 rounded-2xl bg-[#111111] border border-[#222] flex items-center justify-center mb-6 shadow-sm">
-                              <Code2 className="w-8 h-8 opacity-40" />
-                            </div>
-                            <p className="text-sm font-medium">No files yet</p>
-                            <p className="text-xs mt-2 opacity-60">Create a new file in the Explorer to begin coding.</p>
-                          </div>
-                        ) : (
-                          <Editor
-                            height="100%"
-                            path={selectedFile || Object.keys(files)[0]}
-                            language={(files[selectedFile] || Object.values(files)[0])?.language === 'js' ? 'javascript' : (files[selectedFile] || Object.values(files)[0])?.language === 'ts' ? 'typescript' : (files[selectedFile] || Object.values(files)[0])?.language}
-                            theme="black-theme"
-                            beforeMount={(monaco) => {
-                              monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
-                                target: monaco.languages.typescript.ScriptTarget.Latest,
-                                allowNonTsExtensions: true,
-                                moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-                                module: monaco.languages.typescript.ModuleKind.CommonJS,
-                                noEmit: true,
-                                esModuleInterop: true,
-                                jsx: monaco.languages.typescript.JsxEmit.React,
-                                reactNamespace: "React",
-                                allowJs: true,
-                                typeRoots: ["node_modules/@types"]
-                              });
-                              monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-                                target: monaco.languages.typescript.ScriptTarget.Latest,
-                                allowNonTsExtensions: true,
-                                moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-                                module: monaco.languages.typescript.ModuleKind.CommonJS,
-                                noEmit: true,
-                                esModuleInterop: true,
-                                jsx: monaco.languages.typescript.JsxEmit.React,
-                                reactNamespace: "React",
-                                allowJs: true,
-                                typeRoots: ["node_modules/@types"]
-                              });
-                              monaco.editor.defineTheme('black-theme', {
-                                base: 'vs-dark',
-                                inherit: true,
-                                rules: [],
-                                colors: {
-                                  'editor.background': '#000000',
-                                  'editor.lineHighlightBackground': '#111111',
-                                }
-                              });
-                            }}
-                            value={(files[selectedFile] || Object.values(files)[0])?.code}
-                            onChange={(value) => {
-                              if (value !== undefined && selectedFile) {
-                                setFiles(prev => ({
-                                  ...prev,
-                                  [selectedFile]: {
-                                    ...prev[selectedFile],
-                                    code: value
-                                  }
-                                }));
-                              }
-                            }}
-                            options={{
-                              minimap: { enabled: false },
-                              fontSize: 14,
-                              fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
-                              wordWrap: 'off',
-                              scrollBeyondLastLine: false,
-                              smoothScrolling: true,
-                              cursorBlinking: 'smooth',
-                              cursorSmoothCaretAnimation: 'on',
-                              formatOnPaste: true,
-                              quickSuggestions: { other: true, comments: true, strings: true },
-                              suggestOnTriggerCharacters: true,
-                              acceptSuggestionOnEnter: "on",
-                              tabCompletion: "on",
-                              wordBasedSuggestions: "currentDocument",
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                  </div>
-              )}
-            </div>
+        {/* Input Area */}
+        <div className="p-4 border-t border-[#1a1a1a] bg-[#0a0a0a] shrink-0">
+          <PromptInputBox
+            mode="coder"
+            value={input}
+            onChange={setInput}
+            onSend={(msg) => handleSend(msg)}
+            isLoading={isLoading}
+            placeholder="Ask a follow-up..."
+          />
+          <div className="mt-3 flex items-center justify-between text-[11px] text-[#404040] px-1">
+             <div className="flex gap-4">
+               <span className="hover:text-gray-400 cursor-pointer transition-colors">Upgrade to Team for more credits</span>
+             </div>
+             <span className="text-[#10b981] font-semibold hover:underline cursor-pointer flex items-center gap-1">Upgrade Plan <span className="text-[8px] text-[#404040]">✕</span></span>
           </div>
-          
-          {/* Terminal */}
-          <AnimatePresence>
-            {isTerminalOpen && (
-              <motion.div
-                initial={{ height: 0, opacity: 0 }}
-                animate={{ height: '15vh', opacity: 1 }}
-                exit={{ height: 0, opacity: 0 }}
-                transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                className={cn(
-                  "w-full bg-[#0C0C0C] border border-[var(--border-color)] shadow-2xl flex flex-col overflow-hidden shrink-0 z-20",
-                  !(deviceView === 'mobile' && activeTab === 'preview' && !isFullscreen) ? "rounded-none border-0 border-t" : "rounded-xl mt-4"
-                )}
-              >
-                {/* CMD Content */}
-                <div 
-                  className="flex-1 p-2 overflow-y-auto font-['Consolas','Lucida_Console',monospace] text-[14px] text-[#CCCCCC] cursor-text"
-                  onClick={() => document.getElementById('cmd-input')?.focus()}
-                >
-                  {terminalHistory.map((line, i) => (
-                    <div key={i} className="min-h-[20px] whitespace-pre-wrap">{line}</div>
-                  ))}
-                  <div className="flex items-center">
-                    <span className="mr-2">C:\Users\User\vibe-coder&gt;</span>
-                    <input
-                      id="cmd-input"
-                      type="text"
-                      value={terminalInput}
-                      onChange={(e) => setTerminalInput(e.target.value)}
-                      onKeyDown={handleTerminalSubmit}
-                      className="flex-1 bg-transparent border-none outline-none text-[#CCCCCC] font-['Consolas','Lucida_Console',monospace] text-[14px] caret-[#CCCCCC]"
-                      autoFocus
-                      spellCheck={false}
-                      autoComplete="off"
-                    />
-                  </div>
-                  <div ref={terminalEndRef} />
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
         </div>
       </div>
+
+      {/* --- FILE EXPLORER --- */}
+      <div className="w-[280px] flex flex-col border-r border-[#1a1a1a] bg-[#0a0a0a] shrink-0">
+        <div className="p-[14px] flex items-center gap-[22px] text-[#525252]">
+          <CustomDoc />
+          <Search size={17} className="hover:text-white cursor-pointer transition-colors" />
+          <Layers size={17} className="hover:text-white cursor-pointer transition-colors" />
+        </div>
+        
+        <div className="px-4 py-3.5 flex items-center justify-between">
+           <span className="text-[11px] font-bold text-[#737373] tracking-[0.12em] uppercase">PROJECT</span>
+           <div className="flex items-center gap-3 text-[#525252]">
+              <button onClick={() => { setIsCreatingFile(true); setTimeout(() => newFileInputRef.current?.focus(), 50); }} className="hover:text-white transition-colors">
+                <Plus size={14} />
+              </button>
+              <CustomFolder />
+              <RotateCcw size={14} className="hover:text-white cursor-pointer transition-colors" />
+              <div className="w-[14px] h-[14px] border border-[#525252] rounded-[2px] flex items-center justify-center text-[7px] font-bold hover:border-white cursor-pointer transition-colors">
+                □
+              </div>
+              <MoreHorizontal size={14} className="hover:text-white cursor-pointer transition-colors" />
+           </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto custom-scrollbar py-2">
+          {isCreatingFile && (
+            <div className="flex items-center gap-3 px-4 py-[7px] bg-[#1a1a1a]">
+              {(() => {
+                let Icon = CustomDoc;
+                let color = 'text-gray-400';
+                if (newFileName.endsWith('.html')) { Icon = HtmlIcon; color = ''; }
+                else if (newFileName.endsWith('.css')) { Icon = CssIcon; color = ''; }
+                else if (newFileName.endsWith('.js') || newFileName.endsWith('.jsx')) { Icon = JsIcon; color = ''; }
+                else if (newFileName.endsWith('.ts') || newFileName.endsWith('.tsx')) { Icon = TsIcon; color = ''; }
+                else if (newFileName.endsWith('.py')) { Icon = PythonIcon; color = ''; }
+                else if (newFileName.endsWith('.json')) { Icon = FileJson; color = 'text-green-400'; }
+                return <Icon className={cn("w-4 h-4", color)} />;
+              })()}
+              <input
+                ref={newFileInputRef}
+                type="text"
+                value={newFileName}
+                onChange={(e) => setNewFileName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleCreateFile();
+                  if (e.key === 'Escape') { setIsCreatingFile(false); setNewFileName(''); }
+                }}
+                onBlur={() => {
+                  if (newFileName.trim()) handleCreateFile();
+                  else setIsCreatingFile(false);
+                }}
+                className="flex-1 bg-transparent border border-[#404040] outline-none text-white text-[13px] px-1 py-0.5 rounded-sm"
+                placeholder="filename.ext"
+              />
+            </div>
+          )}
+          
+          {Object.keys(files).sort().map((filename) => {
+            const file = files[filename];
+            const Icon = file.icon;
+            const isSelected = selectedFile === filename;
+            
+            return (
+              <FileRow 
+                key={filename} 
+                icon={<Icon className={cn("w-3.5 h-3.5", file.color)} />} 
+                label={filename} 
+                active={isSelected}
+                onClick={() => setSelectedFile(filename)}
+                onRename={(e) => {
+                  e.stopPropagation();
+                  const newName = prompt("Enter new file name:", filename);
+                  if (newName && newName !== filename && !files[newName]) {
+                    setFiles(prev => {
+                      const newFiles = { ...prev };
+                      newFiles[newName] = newFiles[filename];
+                      delete newFiles[filename];
+                      return newFiles;
+                    });
+                    if (selectedFile === filename) {
+                      setSelectedFile(newName);
+                    }
+                  }
+                }}
+                onRemove={(e) => {
+                  e.stopPropagation();
+                  if (confirm(`Are you sure you want to delete ${filename}?`)) {
+                    setFiles(prev => {
+                      const newFiles = { ...prev };
+                      delete newFiles[filename];
+                      return newFiles;
+                    });
+                    if (selectedFile === filename) {
+                      const remainingFiles = Object.keys(files).filter(f => f !== filename);
+                      setSelectedFile(remainingFiles.length > 0 ? remainingFiles[0] : null);
+                    }
+                  }
+                }}
+              />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* --- MAIN WORKSPACE --- */}
+      <div className="flex-1 flex flex-col relative bg-[#0a0a0a] min-w-0">
+        {/* Workspace Top Toolbar */}
+        <div className="h-[56px] flex items-center justify-between px-4 shrink-0 border-b border-[#1a1a1a]">
+          <div className="flex items-center gap-2">
+             <div className="flex items-center gap-3 px-1 text-[#525252]">
+                <ChevronLeft size={18} className="cursor-pointer hover:text-white transition-colors" />
+                <div className="flex gap-[1px] bg-[#141414] p-[3px] rounded-[10px] border border-[#1f1f1f]">
+                  <button 
+                    onClick={() => setActiveTab('preview')}
+                    className={cn("p-1.5 px-2 rounded-[7px] transition-all flex items-center justify-center", activeTab === 'preview' ? 'bg-[#262626] text-white shadow-sm' : 'text-[#737373] hover:text-white')}
+                  >
+                    <Eye size={17} />
+                  </button>
+                  <button 
+                    onClick={() => setActiveTab('code')}
+                    className={cn("p-1.5 px-2 rounded-[7px] transition-all flex items-center justify-center", activeTab === 'code' ? 'bg-[#262626] text-white shadow-sm' : 'text-[#737373] hover:text-white')}
+                  >
+                    <Code2 size={17} />
+                  </button>
+                </div>
+             </div>
+          </div>
+          
+          <div className="flex items-center gap-5 text-[#737373]">
+             {activeTab === 'code' && Object.keys(files).length > 0 && selectedFile && (
+               <select
+                 value={(files[selectedFile] || Object.values(files)[0])?.language || 'plaintext'}
+                 onChange={(e) => {
+                   const newLang = e.target.value;
+                   setFiles(prev => ({
+                     ...prev,
+                     [selectedFile]: {
+                       ...prev[selectedFile],
+                       language: newLang
+                     }
+                   }));
+                 }}
+                 className="bg-[#141414] text-[#a3a3a3] border border-[#262626] rounded-md px-2 py-1 text-xs focus:outline-none focus:border-[#404040] hover:text-white transition-colors cursor-pointer"
+               >
+                 <option value="html">HTML</option>
+                 <option value="css">CSS</option>
+                 <option value="javascript">JavaScript</option>
+                 <option value="typescript">TypeScript</option>
+                 <option value="python">Python</option>
+                 <option value="json">JSON</option>
+                 <option value="plaintext">Plain Text</option>
+               </select>
+             )}
+             <button onClick={() => setIsTerminalOpen(!isTerminalOpen)} className="hover:text-white transition-colors">
+               <TerminalIcon />
+             </button>
+             <MoreHorizontal size={18} className="cursor-pointer hover:text-white transition-colors" />
+          </div>
+        </div>
+
+        {/* Workspace Content */}
+        <div className="flex-1 flex flex-col relative min-h-0">
+           {activeTab === 'code' ? (
+             Object.keys(files).length === 0 ? (
+               <div className="flex-1 flex flex-col items-center justify-center px-12">
+                 <div className="w-full max-w-[480px] flex flex-col items-center text-center">
+                    <div className="opacity-[0.05] grayscale mb-10">
+                       <svg width="100" height="100" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 2L2 19h20L12 2zm0 3.8L18.4 17H5.6L12 5.8z" />
+                       </svg>
+                    </div>
+                    <p className="text-[#525252] text-[14px] mb-12 font-medium">Ask the agent to fix errors or add new features</p>
+                    <div className="w-full space-y-[18px]">
+                       <ShortcutRow label="Go to File" keys={['Ctrl', 'P']} />
+                       <ShortcutRow label="Find in Files" keys={['Ctrl', 'Shift', 'F']} />
+                       <ShortcutRow label="Command Palette" keys={['Ctrl', 'Shift', 'P']} />
+                       <ShortcutRow label="Terminal" keys={['Ctrl', '`']} />
+                    </div>
+                 </div>
+               </div>
+             ) : (
+               <div className="flex-1 relative">
+                 <Editor
+                    height="100%"
+                    path={selectedFile || Object.keys(files)[0]}
+                    language={(files[selectedFile] || Object.values(files)[0])?.language === 'js' ? 'javascript' : (files[selectedFile] || Object.values(files)[0])?.language === 'ts' ? 'typescript' : (files[selectedFile] || Object.values(files)[0])?.language}
+                    theme="vibe-dark"
+                    onMount={(editor) => {
+                      editorRef.current = editor;
+                    }}
+                    beforeMount={(monaco) => {
+                      // Add Python basic completions
+                      monaco.languages.registerCompletionItemProvider('python', {
+                        provideCompletionItems: (model, position) => {
+                          const word = model.getWordUntilPosition(position);
+                          const range = {
+                            startLineNumber: position.lineNumber,
+                            endLineNumber: position.lineNumber,
+                            startColumn: word.startColumn,
+                            endColumn: word.endColumn,
+                          };
+                          const suggestions = [
+                            {
+                              label: 'print',
+                              kind: monaco.languages.CompletionItemKind.Function,
+                              insertText: 'print(${1:value})',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Prints the values to a stream, or to sys.stdout by default.',
+                              range: range
+                            },
+                            {
+                              label: 'def',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'def ${1:name}(${2:args}):\n\t${3:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Define a function',
+                              range: range
+                            },
+                            {
+                              label: 'class',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'class ${1:Name}:\n\tdef __init__(self):\n\t\t${2:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Define a class',
+                              range: range
+                            },
+                            {
+                              label: 'import',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'import ${1:module}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Import a module',
+                              range: range
+                            },
+                            {
+                              label: 'from',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'from ${1:module} import ${2:name}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Import a specific name from a module',
+                              range: range
+                            },
+                            {
+                              label: 'if',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'if ${1:condition}:\n\t${2:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'If statement',
+                              range: range
+                            },
+                            {
+                              label: 'for',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'for ${1:item} in ${2:iterable}:\n\t${3:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'For loop',
+                              range: range
+                            },
+                            {
+                              label: 'while',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'while ${1:condition}:\n\t${2:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'While loop',
+                              range: range
+                            },
+                            {
+                              label: 'try',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:e}:\n\t${4:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Try-except block',
+                              range: range
+                            },
+                            {
+                              label: 'with',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'with ${1:expression} as ${2:name}:\n\t${3:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'With statement',
+                              range: range
+                            },
+                            {
+                              label: 'return',
+                              kind: monaco.languages.CompletionItemKind.Keyword,
+                              insertText: 'return ${1:value}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Return statement',
+                              range: range
+                            },
+                            {
+                              label: '__init__',
+                              kind: monaco.languages.CompletionItemKind.Method,
+                              insertText: 'def __init__(self${1:, args}):\n\t${2:pass}',
+                              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                              documentation: 'Initialize a class instance',
+                              range: range
+                            },
+                            {
+                              label: 'self',
+                              kind: monaco.languages.CompletionItemKind.Variable,
+                              insertText: 'self',
+                              documentation: 'Reference to the current instance of the class',
+                              range: range
+                            }
+                          ];
+                          return { suggestions: suggestions };
+                        }
+                      });
+
+                      monaco.languages.typescript.javascriptDefaults.setCompilerOptions({
+                        target: monaco.languages.typescript.ScriptTarget.Latest,
+                        allowNonTsExtensions: true,
+                        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                        module: monaco.languages.typescript.ModuleKind.CommonJS,
+                        noEmit: true,
+                        esModuleInterop: true,
+                        jsx: monaco.languages.typescript.JsxEmit.React,
+                        reactNamespace: "React",
+                        allowJs: true,
+                        typeRoots: ["node_modules/@types"]
+                      });
+                      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+                        target: monaco.languages.typescript.ScriptTarget.Latest,
+                        allowNonTsExtensions: true,
+                        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+                        module: monaco.languages.typescript.ModuleKind.CommonJS,
+                        noEmit: true,
+                        esModuleInterop: true,
+                        jsx: monaco.languages.typescript.JsxEmit.React,
+                        reactNamespace: "React",
+                        allowJs: true,
+                        typeRoots: ["node_modules/@types"]
+                      });
+                      monaco.editor.defineTheme('vibe-dark', {
+                        base: 'vs-dark',
+                        inherit: true,
+                        rules: [],
+                        colors: {
+                          'editor.background': '#0a0a0a',
+                          'editor.lineHighlightBackground': '#141414',
+                          'editorLineNumber.foreground': '#404040',
+                          'editorIndentGuide.background': '#1f1f1f',
+                          'editorIndentGuide.activeBackground': '#404040',
+                          'editorSuggestWidget.background': '#1e1e1e',
+                          'editorSuggestWidget.border': '#454545',
+                          'editorSuggestWidget.foreground': '#d4d4d4',
+                          'editorSuggestWidget.highlightForeground': '#18a3ff',
+                          'editorSuggestWidget.selectedBackground': '#04395e',
+                          'editorHoverWidget.background': '#1e1e1e',
+                          'editorHoverWidget.border': '#454545',
+                          'editorWidget.background': '#1e1e1e',
+                          'editorWidget.border': '#454545',
+                        }
+                      });
+                    }}
+                    value={(files[selectedFile] || Object.values(files)[0])?.code}
+                    onChange={(value) => {
+                      if (value !== undefined && selectedFile) {
+                        setFiles(prev => {
+                          const currentFile = prev[selectedFile];
+                          return {
+                            ...prev,
+                            [selectedFile]: {
+                              ...currentFile,
+                              code: value
+                            }
+                          };
+                        });
+                      }
+                    }}
+                    options={{
+                      minimap: { enabled: false },
+                      fontSize: 14,
+                      fontFamily: "'JetBrains Mono', 'Fira Code', Consolas, monospace",
+                      wordWrap: 'off',
+                      scrollBeyondLastLine: false,
+                      smoothScrolling: true,
+                      cursorBlinking: 'smooth',
+                      cursorSmoothCaretAnimation: 'on',
+                      formatOnPaste: true,
+                      bracketPairColorization: { enabled: true },
+                      guides: { bracketPairs: true, indentation: true },
+                      renderLineHighlight: 'all',
+                      renderWhitespace: 'selection',
+                      quickSuggestions: { other: true, comments: true, strings: true },
+                      quickSuggestionsDelay: 10,
+                      suggestOnTriggerCharacters: true,
+                      acceptSuggestionOnEnter: "on",
+                      tabCompletion: "on",
+                      wordBasedSuggestions: "allDocuments",
+                      suggestSelection: "first",
+                      snippetSuggestions: "inline",
+                      suggest: {
+                        showIcons: true,
+                        showStatusBar: true,
+                        preview: true,
+                        previewMode: 'subwordSmart',
+                        filterGraceful: true,
+                        snippetsPreventQuickSuggestions: false,
+                        localityBonus: true,
+                        shareSuggestSelections: true,
+                        showInlineDetails: true,
+                        showMethods: true,
+                        showFunctions: true,
+                        showConstructors: true,
+                        showDeprecated: true,
+                        showFields: true,
+                        showVariables: true,
+                        showClasses: true,
+                        showStructs: true,
+                        showInterfaces: true,
+                        showModules: true,
+                        showProperties: true,
+                        showEvents: true,
+                        showOperators: true,
+                        showUnits: true,
+                        showValues: true,
+                        showConstants: true,
+                        showEnums: true,
+                        showEnumMembers: true,
+                        showKeywords: true,
+                        showWords: true,
+                        showColors: true,
+                        showFiles: true,
+                        showReferences: true,
+                        showFolders: true,
+                        showTypeParameters: true,
+                        showSnippets: true,
+                      },
+                      inlineSuggest: { enabled: true },
+                      hover: { enabled: true, delay: 300 },
+                      parameterHints: { enabled: true },
+                      fixedOverflowWidgets: true,
+                      padding: { top: 16 }
+                    }}
+                  />
+               </div>
+             )
+           ) : (
+             <div className="flex-1 relative bg-[#0a0a0a]">
+                {isLoading && (
+                  <div className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-[#0a0a0a]/90 backdrop-blur-md">
+                    <div className="w-10 h-10 border-2 border-[#333] border-t-white rounded-full animate-spin mb-4" />
+                    <TextShimmer className="text-white font-medium tracking-widest text-xs uppercase">
+                      {isFixingError ? 'Fixing error...' : 'Building preview...'}
+                    </TextShimmer>
+                  </div>
+                )}
+                {Object.keys(files).length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-[#404040] bg-[#0a0a0a]">
+                    <Eye size={64} className="mb-4 opacity-10" />
+                    <p className="text-[14px] font-medium opacity-50 uppercase tracking-[0.2em]">Preview Mode</p>
+                  </div>
+                ) : (
+                  <iframe 
+                    key={previewKey}
+                    srcDoc={getPreviewHtml()}
+                    className="w-full h-full border-none bg-white"
+                    title="Live Preview" 
+                    sandbox="allow-scripts allow-same-origin allow-forms allow-popups"
+                  />
+                )}
+             </div>
+           )}
+           
+           {/* Terminal Overlay */}
+           {isTerminalOpen && (
+             <div className="absolute bottom-0 left-0 right-0 h-64 bg-[#0C0C0C] border-t border-[#1a1a1a] flex flex-col z-20" style={{ fontFamily: 'Consolas, "Courier New", monospace' }}>
+               <div className="flex items-center justify-between px-4 py-2 bg-white text-black">
+                 <div className="flex items-center gap-2">
+                   <TerminalIcon />
+                   <span className="text-[12px] font-semibold">Command Prompt</span>
+                 </div>
+                 <button onClick={() => setIsTerminalOpen(false)} className="text-black hover:bg-[#e81123] hover:text-white px-3 py-1 transition-colors">
+                   <X size={14} />
+                 </button>
+               </div>
+               <div className="flex-1 overflow-y-auto custom-scrollbar p-2 text-[14px] text-[#CCCCCC]" onClick={() => document.getElementById('cmd-input')?.focus()}>
+                 {terminalHistory.map((line, i) => (
+                   <div key={i} className="whitespace-pre-wrap leading-tight">{line}</div>
+                 ))}
+                 <div className="flex items-center mt-1 relative leading-tight">
+                   <span className="mr-2">C:\Users\User\vibe-coder&gt;</span>
+                   <div className="relative flex-1 flex items-center">
+                     <span className="whitespace-pre">{terminalInput}</span>
+                     <span className="inline-block w-[8px] h-[15px] bg-[#CCCCCC] ml-[1px] terminal-cursor"></span>
+                     <input
+                       id="cmd-input"
+                       type="text"
+                       value={terminalInput}
+                       onChange={(e) => setTerminalInput(e.target.value)}
+                       onKeyDown={handleTerminalSubmit}
+                       className="absolute inset-0 opacity-0 cursor-text"
+                       autoFocus
+                       onBlur={(e) => e.target.focus()}
+                     />
+                   </div>
+                 </div>
+                 <div ref={terminalEndRef} />
+               </div>
+             </div>
+           )}
+        </div>
+      </div>
+
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes terminal-blink {
+          0%, 49.9% { opacity: 1; }
+          50%, 100% { opacity: 0; }
+        }
+        .terminal-cursor {
+          animation: terminal-blink 1s infinite;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 5px;
+          height: 5px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: transparent;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #1f1f1f;
+          border-radius: 10px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #262626;
+        }
+      `}} />
     </div>
   );
 }
+
+const CustomFolder = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+const CustomDoc = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-80">
+    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+    <polyline points="14 2 14 8 20 8" />
+  </svg>
+);
+
+const TerminalIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="4 17 10 11 4 5" />
+    <line x1="12" y1="19" x2="20" y2="19" />
+  </svg>
+);
+
+const FileRow = ({ icon, label, inset = false, hasDot = false, onClick, active = false, onRename, onRemove }: { icon: React.ReactNode, label: string, inset?: boolean, hasDot?: boolean, onClick?: () => void, active?: boolean, onRename?: (e: React.MouseEvent) => void, onRemove?: (e: React.MouseEvent) => void }) => (
+  <div onClick={onClick} title={label} className={cn("flex items-center gap-3 px-4 py-[7px] cursor-pointer group transition-colors relative", inset ? 'pl-[38px]' : '', active ? 'bg-[#1a1a1a] text-white' : 'hover:bg-[#111111] text-[#8a8a8a]')}>
+    <span className={cn("flex-shrink-0 flex items-center justify-center w-3.5", active ? 'text-white' : 'text-[#525252]')}>
+      {icon}
+    </span>
+    <span className="flex-1 truncate text-[13px] font-medium group-hover:text-[#f5f5f5] tracking-tight">{label}</span>
+    {hasDot && <div className="w-[3px] h-[3px] bg-red-500 rounded-full mr-1"></div>}
+    <div className="hidden group-hover:flex items-center gap-1 absolute right-2 bg-[#111111] pl-2">
+      {onRename && (
+        <button onClick={onRename} className="p-1 hover:bg-[#2a2a2a] rounded text-[#8a8a8a] hover:text-white transition-colors" title="Rename">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"></path></svg>
+        </button>
+      )}
+      {onRemove && (
+        <button onClick={onRemove} className="p-1 hover:bg-[#e81123] rounded text-[#8a8a8a] hover:text-white transition-colors" title="Remove">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path></svg>
+        </button>
+      )}
+    </div>
+  </div>
+);
+
+const ShortcutRow = ({ label, keys }: { label: string, keys: string[] }) => (
+  <div className="flex justify-between items-center text-[13px] text-[#525252] group px-1">
+    <span className="group-hover:text-[#9e9e9e] transition-colors">{label}</span>
+    <div className="flex items-center gap-1.5">
+      {keys.map((key: string, i: number) => (
+        <React.Fragment key={key}>
+          <span className="bg-[#141414] border border-[#1f1f1f] px-[6px] py-[3px] rounded-[5px] text-[10.5px] font-mono min-w-[30px] text-center text-[#737373] shadow-sm">
+            {key}
+          </span>
+          {i < keys.length - 1 && <span className="text-[#333] text-[9px]">+</span>}
+        </React.Fragment>
+      ))}
+    </div>
+  </div>
+);

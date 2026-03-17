@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
 import { 
   Copy, 
@@ -20,59 +20,10 @@ export interface ChatMessageProps {
   content: string;
   onRegenerate?: () => void;
   isStreaming?: boolean;
-  typingSpeed?: 'slow' | 'normal' | 'fast';
   isSearching?: boolean;
   isThinking?: boolean;
   isCanvas?: boolean;
 }
-
-const useTypewriter = (text: string, isEnabled: boolean = false, speed: 'slow' | 'normal' | 'fast' = 'normal') => {
-  const [displayedText, setDisplayedText] = useState('');
-  const index = useRef(0);
-
-  useEffect(() => {
-    if (!isEnabled) {
-      index.current = text.length;
-      return;
-    }
-
-    // If text was reset (e.g. new message), reset index
-    if (text.length < index.current) {
-        index.current = 0;
-        setTimeout(() => setDisplayedText(''), 0);
-    }
-    
-    // If already caught up, do nothing
-    if (index.current >= text.length) {
-        return;
-    }
-
-    let animationId: number;
-
-    const animate = () => {
-      if (index.current < text.length) {
-        // Calculate how many characters to add based on "distance" to target
-        const distance = text.length - index.current;
-        
-        let divisor = 10;
-        if (speed === 'slow') divisor = 20;
-        if (speed === 'fast') divisor = 5;
-
-        // Add at least 1 char, but speed up if falling behind
-        const step = Math.max(1, Math.ceil(distance / divisor)); 
-        
-        index.current = Math.min(index.current + step, text.length);
-        setDisplayedText(text.slice(0, index.current));
-        animationId = requestAnimationFrame(animate);
-      }
-    };
-
-    animationId = requestAnimationFrame(animate);
-    return () => cancelAnimationFrame(animationId);
-  }, [text, isEnabled, speed]);
-
-  return isEnabled ? displayedText : text;
-};
 
 const CodeBlock = ({ code, language, isStreaming }: { code: string, language: string, isStreaming?: boolean }) => {
   const [isEditing, setIsEditing] = React.useState(false);
@@ -320,20 +271,19 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
   );
 });
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, isThinking, isCanvas, typingSpeed = 'normal' }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegenerate, isStreaming, isSearching, isThinking, isCanvas }) => {
   const isUser = role === 'user';
   const [isCopied, setIsCopied] = useState(false);
 
   let displayContent = content;
   if (isUser) {
-    const match = displayContent.match(/^\[(Canvas|Search|Think):\s*(.*)\]$/s);
+    const match = displayContent.match(/^\[(Canvas|Search|Think|Reasoning|Project|Deploy|Format|Terminal):\s*(.*)\]$/s);
     if (match) {
       displayContent = match[2];
     }
   }
 
-  // Use typewriter effect only for model messages that are streaming
-  const displayedContent = useTypewriter(content, isStreaming && !isUser, typingSpeed);
+  const displayedContent = content;
 
   const handleCopy = async () => {
     await navigator.clipboard.writeText(content);
@@ -413,7 +363,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
                    >
                      <FolderCode className="w-4 h-4 text-orange-400" />
                    </motion.div>
-                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Creating canvas...</TextShimmer>
+                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Working on canvas...</TextShimmer>
                  </>
                ) : (
                  <>

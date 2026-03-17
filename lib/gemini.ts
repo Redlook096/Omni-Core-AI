@@ -128,7 +128,7 @@ export async function* streamChat(
     finalSystemInstruction += `\n\n[INSTRUCTION]: Regenerate this response. Change the structure or angle. If the previous answer was too long, make this one concise. If it was too short, expand.`;
   }
 
-  finalSystemInstruction += `\n\n**CRITICAL:** If the user's message starts with \`[Canvas: \`, you MUST ONLY output the code block. Do NOT output any conversational text, explanations, or markdown outside of the code block. Just the \`\`\`language ... \`\`\` block.`;
+  finalSystemInstruction += `\n\n**CRITICAL:** If the user's message starts with \`[Canvas: \`, you MUST output ONLY the code block, followed by a very brief, single-line comment or summary underneath it. Do NOT output any conversational filler text before the code block. Just start immediately with the \`\`\`language ... \`\`\` block.`;
 
   finalSystemInstruction += `\n\nCRITICAL DESIGN RULES TO AVOID AI TROPES:
 1. Color palette: Pick 1 dominant color, 1 accent, 1 neutral. Use that combo everywhere. Avoid high-saturation pink + purple unless specifically requested. Use muted earth tones for cozy/vintage, black + electric cyan/magenta for cyber/tech.

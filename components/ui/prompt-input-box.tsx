@@ -1,7 +1,7 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, BrainCog, FolderCode } from "lucide-react";
+import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, Terminal, FileCode, BrainCog, FolderCode, Rocket } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import TextareaAutosize, { TextareaAutosizeProps } from "react-textarea-autosize";
 import { cn } from "../../lib/utils";
@@ -444,7 +444,6 @@ const CustomDivider: React.FC = () => (
 );
 
 // Main PromptInputBox Component
-import { t } from '../../lib/translations';
 
 interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
@@ -453,12 +452,12 @@ interface PromptInputBoxProps {
   className?: string;
   value?: string;
   onChange?: (value: string) => void;
-  language?: string;
   hideOptions?: boolean;
   customActions?: React.ReactNode;
+  mode?: 'chat' | 'coder';
 }
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange, language = 'English', hideOptions = false, customActions } = props;
+  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange, hideOptions = false, customActions, mode = 'chat' } = props;
   const [internalInput, setInternalInput] = React.useState("");
   const input = value !== undefined ? value : internalInput;
   const setInput = (newVal: string) => {
@@ -469,23 +468,49 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [filePreviews, setFilePreviews] = React.useState<{ [key: string]: string }>({});
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   const [isRecording, setIsRecording] = React.useState(false);
+  
+  const [showDeploy, setShowDeploy] = React.useState(false);
+  const [showFormat, setShowFormat] = React.useState(false);
+  const [showTerminal, setShowTerminal] = React.useState(false);
+
   const [showSearch, setShowSearch] = React.useState(false);
   const [showThink, setShowThink] = React.useState(false);
   const [showCanvas, setShowCanvas] = React.useState(false);
+
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
   const promptBoxRef = React.useRef<HTMLDivElement>(null);
 
   const handleToggleChange = (value: string) => {
-    if (value === "search") {
-      setShowSearch((prev) => !prev);
-      setShowThink(false);
-    } else if (value === "think") {
-      setShowThink((prev) => !prev);
-      setShowSearch(false);
+    if (mode === 'coder') {
+      if (value === "deploy") {
+        setShowDeploy((prev) => !prev);
+        setShowFormat(false);
+        setShowTerminal(false);
+      } else if (value === "format") {
+        setShowFormat((prev) => !prev);
+        setShowDeploy(false);
+        setShowTerminal(false);
+      } else if (value === "terminal") {
+        setShowTerminal((prev) => !prev);
+        setShowDeploy(false);
+        setShowFormat(false);
+      }
+    } else {
+      if (value === "search") {
+        setShowSearch((prev) => !prev);
+        setShowThink(false);
+        setShowCanvas(false);
+      } else if (value === "think") {
+        setShowThink((prev) => !prev);
+        setShowSearch(false);
+        setShowCanvas(false);
+      } else if (value === "canvas") {
+        setShowCanvas((prev) => !prev);
+        setShowSearch(false);
+        setShowThink(false);
+      }
     }
   };
-
-  const handleCanvasToggle = () => setShowCanvas((prev) => !prev);
 
   const isImageFile = (file: File) => file.type.startsWith("image/");
 
@@ -553,25 +578,18 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const handleSubmit = async () => {
     if (input.trim() || files.length > 0) {
       let messagePrefix = "";
-      let autoCanvas = false;
       
-      if (showSearch) messagePrefix = "[Search: ";
-      else if (showThink) messagePrefix = "[Think: ";
-      else if (showCanvas) messagePrefix = "[Canvas: ";
-      else {
-        // Use fast regex detection instead of slow AI call to prevent UI freezing
-        const isCodeRequest = /\b(code|script|function|app|component|html|css|javascript|python|react|vue|angular|node|express|api|endpoint|database|sql|build|create|make)\b/i.test(input);
-        if (isCodeRequest) {
-          messagePrefix = "[Canvas: ";
-          autoCanvas = true;
-        }
+      if (mode === 'coder') {
+        if (showDeploy) messagePrefix = "[Deploy: ";
+        else if (showFormat) messagePrefix = "[Format: ";
+        else if (showTerminal) messagePrefix = "[Terminal: ";
+      } else {
+        if (showSearch) messagePrefix = "[Search: ";
+        else if (showThink) messagePrefix = "[Think: ";
+        else if (showCanvas) messagePrefix = "[Canvas: ";
       }
       
       const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
-      
-      if (autoCanvas) {
-        setShowCanvas(true);
-      }
       
       onSend(formattedInput, files);
       setInput("");
@@ -646,12 +664,20 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
         >
           <PromptInputTextarea
             placeholder={
-              showSearch
-                ? t(language, 'search') + "..."
+              mode === 'coder'
+                ? showDeploy
+                  ? "Deploy to production..."
+                  : showFormat
+                  ? "Format code..."
+                  : showTerminal
+                  ? "Run terminal command..."
+                  : placeholder
+                : showSearch
+                ? "Search the web..."
                 : showThink
-                ? t(language, 'think') + "..."
+                ? "Thinking about..."
                 : showCanvas
-                ? t(language, 'canvas') + "..."
+                ? "Working on canvas..."
                 : placeholder
             }
             className="text-base"
@@ -698,25 +724,29 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                   <div className="flex items-center">
                     <button
                       type="button"
-                      onClick={() => handleToggleChange("search")}
+                      onClick={() => handleToggleChange(mode === 'coder' ? "deploy" : "search")}
                       className={cn(
                         "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                        showSearch
+                        (mode === 'coder' ? showDeploy : showSearch)
                           ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
                           : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
                     >
                       <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                         <motion.div
-                          animate={{ rotate: showSearch ? 360 : 0, scale: showSearch ? 1.1 : 1 }}
-                          whileHover={{ rotate: showSearch ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                          animate={{ rotate: (mode === 'coder' ? showDeploy : showSearch) ? 360 : 0, scale: (mode === 'coder' ? showDeploy : showSearch) ? 1.1 : 1 }}
+                          whileHover={{ rotate: (mode === 'coder' ? showDeploy : showSearch) ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
                           transition={{ type: "spring", stiffness: 260, damping: 25 }}
                         >
-                          <Globe className={cn("w-4 h-4", showSearch ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          {mode === 'coder' ? (
+                            <Rocket className={cn("w-4 h-4", showDeploy ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          ) : (
+                            <Globe className={cn("w-4 h-4", showSearch ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          )}
                         </motion.div>
                       </div>
                       <AnimatePresence>
-                        {showSearch && (
+                        {(mode === 'coder' ? showDeploy : showSearch) && (
                           <motion.span
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: "auto", opacity: 1 }}
@@ -724,7 +754,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                             transition={{ duration: 0.2 }}
                             className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                           >
-                            {t(language, 'search')}
+                            {mode === 'coder' ? "Deploy" : "Search"}
                           </motion.span>
                         )}
                       </AnimatePresence>
@@ -734,25 +764,29 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
 
                     <button
                       type="button"
-                      onClick={() => handleToggleChange("think")}
+                      onClick={() => handleToggleChange(mode === 'coder' ? "format" : "think")}
                       className={cn(
                         "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                        showThink
+                        (mode === 'coder' ? showFormat : showThink)
                           ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
                           : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
                     >
                       <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                         <motion.div
-                          animate={{ rotate: showThink ? 360 : 0, scale: showThink ? 1.1 : 1 }}
-                          whileHover={{ rotate: showThink ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                          animate={{ rotate: (mode === 'coder' ? showFormat : showThink) ? 360 : 0, scale: (mode === 'coder' ? showFormat : showThink) ? 1.1 : 1 }}
+                          whileHover={{ rotate: (mode === 'coder' ? showFormat : showThink) ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
                           transition={{ type: "spring", stiffness: 260, damping: 25 }}
                         >
-                          <BrainCog className={cn("w-4 h-4", showThink ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          {mode === 'coder' ? (
+                            <FileCode className={cn("w-4 h-4", showFormat ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          ) : (
+                            <BrainCog className={cn("w-4 h-4", showThink ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          )}
                         </motion.div>
                       </div>
                       <AnimatePresence>
-                        {showThink && (
+                        {(mode === 'coder' ? showFormat : showThink) && (
                           <motion.span
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: "auto", opacity: 1 }}
@@ -760,7 +794,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                             transition={{ duration: 0.2 }}
                             className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                           >
-                            {t(language, 'think')}
+                            {mode === 'coder' ? "Format" : "Think"}
                           </motion.span>
                         )}
                       </AnimatePresence>
@@ -770,25 +804,29 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
 
                     <button
                       type="button"
-                      onClick={handleCanvasToggle}
+                      onClick={() => handleToggleChange(mode === 'coder' ? "terminal" : "canvas")}
                       className={cn(
                         "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                        showCanvas
+                        (mode === 'coder' ? showTerminal : showCanvas)
                           ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
                           : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
                       )}
                     >
                       <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                         <motion.div
-                          animate={{ rotate: showCanvas ? 360 : 0, scale: showCanvas ? 1.1 : 1 }}
-                          whileHover={{ rotate: showCanvas ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
+                          animate={{ rotate: (mode === 'coder' ? showTerminal : showCanvas) ? 360 : 0, scale: (mode === 'coder' ? showTerminal : showCanvas) ? 1.1 : 1 }}
+                          whileHover={{ rotate: (mode === 'coder' ? showTerminal : showCanvas) ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
                           transition={{ type: "spring", stiffness: 260, damping: 25 }}
                         >
-                          <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          {mode === 'coder' ? (
+                            <Terminal className={cn("w-4 h-4", showTerminal ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          ) : (
+                            <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[var(--text-primary)]" : "text-inherit")} />
+                          )}
                         </motion.div>
                       </div>
                       <AnimatePresence>
-                        {showCanvas && (
+                        {(mode === 'coder' ? showTerminal : showCanvas) && (
                           <motion.span
                             initial={{ width: 0, opacity: 0 }}
                             animate={{ width: "auto", opacity: 1 }}
@@ -796,7 +834,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                             transition={{ duration: 0.2 }}
                             className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                           >
-                            {t(language, 'canvas')}
+                            {mode === 'coder' ? "Terminal" : "Canvas"}
                           </motion.span>
                         )}
                       </AnimatePresence>

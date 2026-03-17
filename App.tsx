@@ -4,7 +4,7 @@ import { Dock, DockIcon, DockItem, DockLabel } from './components/ui/dock';
 import { Home, ChevronDown } from 'lucide-react';
 import { GradualSpacing } from './components/ui/gradual-spacing';
 import { ChatMessage } from './components/ui/chat-message';
-import { streamChat, generateTitle } from './lib/gemini';
+import { streamChat, generateTitle, detectCodeIntent } from './lib/gemini';
 import { t } from './lib/translations';
 import { AnimatePresence, motion } from 'framer-motion';
 import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Download, Code, Zap, BarChart, Bug, Languages, Terminal } from 'lucide-react';
@@ -300,14 +300,19 @@ export default function App() {
   const handleScroll = () => {
     if (!mainContentRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = mainContentRef.current;
-    // Check if we are near the bottom of the container
-    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 150;
+    // Check if we are near the bottom of the container (accounting for pb-40 which is 160px)
+    const isAtBottom = scrollTop + clientHeight >= scrollHeight - 250;
     isUserScrolledUp.current = !isAtBottom;
   };
 
   const scrollToBottom = (force = false) => {
     if (!isUserScrolledUp.current || force) {
-      messagesEndRef.current?.scrollIntoView({ behavior: force ? 'smooth' : 'auto' });
+      if (mainContentRef.current) {
+        mainContentRef.current.scrollTo({
+          top: mainContentRef.current.scrollHeight,
+          behavior: force ? 'smooth' : 'auto'
+        });
+      }
     }
   };
 
@@ -423,12 +428,28 @@ export default function App() {
     setTimeout(() => scrollToBottom(true), 100);
 
     try {
+      let processedValue = value;
+      if (!/^\[(Search|Think|Canvas|Reasoning|Project|Deploy|Format|Terminal):\s*/.test(processedValue)) {
+        const isCodeIntent = await detectCodeIntent(processedValue);
+        if (isCodeIntent) {
+          processedValue = `[Canvas: ${processedValue}]`;
+          // Update the message in state to show the canvas animation
+          setMessages(prev => {
+            const updated = [...prev];
+            updated[updated.length - 1] = { role: 'user', content: processedValue };
+            return updated;
+          });
+          // Also update newMessages so streamChat gets the correct history
+          newMessages[newMessages.length - 1].content = processedValue;
+        }
+      }
+
       // Add placeholder for AI response
       setMessages(prev => [...prev, { role: 'model', content: '' }]);
       
       let fullResponse = '';
       const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
-      const stream = streamChat(newMessages, value, customPersona, false, creativityLevel);
+      const stream = streamChat(newMessages, processedValue, customPersona, false, creativityLevel);
       
       if (streamResponses) {
         for await (const chunk of stream) {
