@@ -201,7 +201,7 @@ export default function App() {
     const handleAutoFixCode = (e: Event) => {
       const customEvent = e as CustomEvent;
       const { code, language, error } = customEvent.detail;
-      const prompt = `The following ${language} code failed to execute:\n\n\`\`\`${language}\n${code}\n\`\`\`\n\nIt produced this error:\n\`\`\`\n${error}\n\`\`\`\n\nPlease fix the code and provide the fully functional version. Ensure it is 100% functional and fixes the error.`;
+      const prompt = `[Error: The ${language} code failed to execute.]\n\n\`\`\`${language}\n${code}\n\`\`\`\n\nError details:\n\`\`\`\n${error}\n\`\`\`\n\nPlease fix the code and provide the fully functional version. Ensure it is 100% functional and fixes the error.`;
       
       // Keep the code runner open and show fixing state
       setRunnerState(prev => ({ ...prev, isFixingErrors: true }));

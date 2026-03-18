@@ -7,7 +7,10 @@ import {
   Search,
   BrainCog,
   FolderCode,
-  RefreshCw
+  RefreshCw,
+  X,
+  Square,
+  CheckSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
@@ -228,25 +231,55 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                                 }
                                 
                                 // Handle newlines and bullet points
-                                return subSubPart.split('\n').map((line, l, arr) => (
-                                  <React.Fragment key={l}>
-                                    {line.trim().startsWith('- ') || line.trim().startsWith('• ') ? (
-                                      <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
-                                         <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
-                                         <span className="flex-1 leading-relaxed">{line.trim().substring(2)}</span>
-                                      </span>
-                                    ) : line.trim().startsWith('>') ? (
-                                      <blockquote className="border-l-4 border-[var(--border-color)] pl-4 py-2 my-4 text-[var(--text-secondary)] italic bg-[var(--bg-hover)]/50 rounded-r-lg">
-                                        {line.trim().replace(/^>[;\s]*/, '')}
-                                      </blockquote>
-                                    ) : (
-                                      <span className={cn(line.trim() === "" ? "block h-4" : "")}>
-                                         {line}
-                                      </span>
-                                    )}
-                                    {l < arr.length - 1 && line.trim() !== "" && !line.trim().startsWith('-') && !line.trim().startsWith('•') && !line.trim().startsWith('>') && <br />}
-                                  </React.Fragment>
-                                ));
+                                return subSubPart.split('\n').map((line, l, arr) => {
+                                  const trimmedLine = line.trim();
+                                  
+                                  // Checklist patterns
+                                  const isUnchecked = trimmedLine.startsWith('- [ ] ');
+                                  const isChecked = trimmedLine.startsWith('- [x] ') || trimmedLine.startsWith('- [X] ');
+                                  const isError = trimmedLine.startsWith('- [!] ') || trimmedLine.startsWith('- [E] ');
+                                  const isBullet = trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ');
+
+                                  return (
+                                    <React.Fragment key={l}>
+                                      {isUnchecked || isChecked || isError ? (
+                                        <motion.div 
+                                          initial={{ opacity: 0, x: -10 }}
+                                          animate={{ opacity: 1, x: 0 }}
+                                          className={cn(
+                                            "flex items-start gap-3 ml-2 my-2.5 p-3 rounded-xl border transition-all duration-300",
+                                            isUnchecked && "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)]",
+                                            isChecked && "bg-emerald-500/5 border-emerald-500/20 text-emerald-500/90",
+                                            isError && "bg-red-500/5 border-red-500/20 text-red-500/90 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
+                                          )}
+                                        >
+                                          <div className="mt-0.5 shrink-0">
+                                            {isUnchecked && <Square className="w-4 h-4 opacity-40" />}
+                                            {isChecked && <CheckSquare className="w-4 h-4" />}
+                                            {isError && <X className="w-4 h-4" />}
+                                          </div>
+                                          <span className="flex-1 leading-relaxed font-medium">
+                                            {trimmedLine.substring(6)}
+                                          </span>
+                                        </motion.div>
+                                      ) : isBullet ? (
+                                        <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
+                                           <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
+                                           <span className="flex-1 leading-relaxed">{trimmedLine.substring(2)}</span>
+                                        </span>
+                                      ) : trimmedLine.startsWith('>') ? (
+                                        <blockquote className="border-l-4 border-[var(--border-color)] pl-4 py-2 my-4 text-[var(--text-secondary)] italic bg-[var(--bg-hover)]/50 rounded-r-lg">
+                                          {trimmedLine.replace(/^>[;\s]*/, '')}
+                                        </blockquote>
+                                      ) : (
+                                        <span className={cn(trimmedLine === "" ? "block h-4" : "")}>
+                                           {line}
+                                        </span>
+                                      )}
+                                      {l < arr.length - 1 && trimmedLine !== "" && !isBullet && !isUnchecked && !isChecked && !isError && !trimmedLine.startsWith('>') && <br />}
+                                    </React.Fragment>
+                                  );
+                                });
                               })}
                             </span>
                           );
@@ -277,9 +310,32 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
 
   let displayContent = content;
   if (isUser) {
-    const match = displayContent.match(/^\[(Canvas|Search|Think|Reasoning|Project|Deploy|Format|Terminal):\s*(.*)\]$/s);
-    if (match) {
-      displayContent = match[2];
+    const canvasMatch = displayContent.match(/^\[(Canvas|Search|Think|Reasoning|Project|Deploy|Format|Terminal):\s*(.*)\]$/s);
+    if (canvasMatch) {
+      displayContent = canvasMatch[2];
+    }
+    
+    const errorMatch = displayContent.match(/^\[Error:\s*(.*)\]$/s);
+    if (errorMatch) {
+      return (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex w-full mb-8 justify-center"
+        >
+          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 max-w-[90%] md:max-w-[600px] flex items-start gap-3 shadow-[0_0_20px_rgba(239,68,68,0.05)]">
+            <div className="mt-1 p-1 bg-red-500 rounded-full shrink-0">
+              <X className="w-3 h-3 text-white" />
+            </div>
+            <div className="flex-1">
+              <div className="text-red-500 font-bold text-sm mb-1 uppercase tracking-wider">Execution Error</div>
+              <div className="text-red-400/90 text-[15px] leading-relaxed">
+                {errorMatch[1]}
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      );
     }
   }
 

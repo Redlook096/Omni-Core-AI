@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Eye,
   Code2,
@@ -14,7 +14,8 @@ import {
   ChevronLeft,
   FileCode,
   FileJson,
-  X
+  X,
+  XCircle
 } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { PromptInputBox } from './prompt-input-box';
@@ -77,67 +78,151 @@ const TsIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-function GenerationProgress({ isStreaming, steps }: { isStreaming: boolean, steps: string[] }) {
+function GenerationProgress({ 
+  isStreaming, 
+  steps, 
+  files 
+}: { 
+  isStreaming: boolean, 
+  steps: (string | { text: string, failed?: boolean })[],
+  files?: Record<string, { code: string, language: string }>
+}) {
   const [currentStep, setCurrentStep] = useState(0);
+  const [isWaiting, setIsWaiting] = useState(false);
 
   useEffect(() => {
     if (!isStreaming) {
+      setCurrentStep(steps.length);
       return;
     }
     
-    const timeout = setTimeout(() => setCurrentStep(0), 0);
-    const interval = setInterval(() => {
-      setCurrentStep(prev => Math.min(prev + 1, steps.length - 1));
-    }, 2000);
+    setCurrentStep(0);
+    let step = 0;
+    
+    const processNextStep = () => {
+      if (step < steps.length - 1) {
+        // Step is "done", wait 1 second then move to next
+        setIsWaiting(true);
+        setTimeout(() => {
+          setIsWaiting(false);
+          step++;
+          setCurrentStep(step);
+          // Start next step
+          if (step < steps.length - 1) {
+            // This step will take some time to "complete"
+            // In a real app we'd wait for actual file writes, 
+            // but here we simulate with a timer
+            setTimeout(processNextStep, 3000);
+          }
+        }, 1000);
+      }
+    };
+
+    const initialTimeout = setTimeout(() => {
+      setTimeout(processNextStep, 3000);
+    }, 500);
 
     return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
+      clearTimeout(initialTimeout);
     };
   }, [isStreaming, steps.length]);
 
   return (
     <div className="mt-2 space-y-2">
       {steps.length > 0 && (
-        <div className="flex flex-col gap-2">
-          {steps.map((step, index) => {
-            const isCompleted = !isStreaming || index < currentStep;
-            const isActive = isStreaming && index === currentStep;
+        <div className="flex flex-col gap-1.5">
+          <AnimatePresence mode="popLayout">
+            {steps.map((step, index) => {
+              const stepText = typeof step === 'string' ? step : step.text;
+              const isFailed = typeof step !== 'string' && step.failed;
+              const isCompleted = (!isStreaming || index < currentStep) && !isFailed;
+              const isActive = isStreaming && index === currentStep && !isFailed && !isWaiting;
+              
+              // Try to find a matching file for the code preview
+              const matchingFile = files ? Object.entries(files).find(([name]) => 
+                stepText.toLowerCase().includes(name.toLowerCase()) || 
+                (name === 'index.html' && stepText.toLowerCase().includes('structure')) ||
+                (name.includes('layout') && stepText.toLowerCase().includes('layout')) ||
+                (name.includes('component') && stepText.toLowerCase().includes('component'))
+              ) : null;
 
-            return (
-              <motion.div 
-                key={index}
-                initial={{ opacity: 0, y: 5 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: index * 0.1, ease: "easeOut" }}
-                className={cn(
-                  "flex items-center gap-3 text-[13px] font-medium transition-all duration-300 py-1.5",
-                  isCompleted && !isActive ? "text-[#8a8a8a] bg-transparent" : 
-                  isActive ? "text-[#f5f5f5] bg-transparent" : 
-                  "text-[#525252] bg-transparent"
-                )}
-              >
-                {isCompleted && !isActive ? (
-                  <motion.div
-                    initial={{ scale: 0 }}
-                    animate={{ scale: 1 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
+              return (
+                <div key={index} className="flex flex-col">
+                  <motion.div 
+                    initial={{ opacity: 0, x: -10, filter: "blur(8px)" }}
+                    animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
+                    exit={{ opacity: 0, x: 10, filter: "blur(8px)" }}
+                    transition={{ 
+                      duration: 0.5, 
+                      delay: index * 0.03, 
+                      ease: [0.16, 1, 0.3, 1] 
+                    }}
+                    className={cn(
+                      "flex items-center gap-3 text-[13px] font-medium transition-all duration-300 py-1",
+                      isFailed ? "text-[#ef4444]" :
+                      isCompleted ? "text-[#8a8a8a] bg-transparent" : 
+                      isActive ? "text-[#f5f5f5] bg-transparent" : 
+                      "text-[#525252] bg-transparent"
+                    )}
                   >
-                    <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
+                    <div className="flex-shrink-0 w-4 h-4 flex items-center justify-center">
+                      {isFailed ? (
+                        <motion.div
+                          initial={{ scale: 0, rotate: -45 }}
+                          animate={{ scale: 1, rotate: 0 }}
+                          transition={{ type: "spring", stiffness: 400, damping: 15 }}
+                        >
+                          <XCircle className="w-4 h-4 text-[#ef4444]" />
+                        </motion.div>
+                      ) : isCompleted ? (
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-[#10b981]" />
+                        </motion.div>
+                      ) : isActive ? (
+                        <Loader2 className="w-4 h-4 text-[#3b82f6] animate-spin" />
+                      ) : (
+                        <div className="w-3.5 h-3.5 rounded-full border-2 border-[#333]" />
+                      )}
+                    </div>
+                    {isActive ? (
+                      <TextShimmer duration={4} className="flex-1 font-medium tracking-tight">{stepText}</TextShimmer>
+                    ) : (
+                      <span className="flex-1 tracking-tight">{stepText}</span>
+                    )}
                   </motion.div>
-                ) : isActive ? (
-                  <Loader2 className="w-4 h-4 text-[#3b82f6] animate-spin" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full border-2 border-[#333]" />
-                )}
-                {isActive ? (
-                  <TextShimmer className="flex-1 font-medium">{step}</TextShimmer>
-                ) : (
-                  <span className="flex-1">{step}</span>
-                )}
-              </motion.div>
-            );
-          })}
+
+                  <AnimatePresence>
+                    {isActive && matchingFile && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        transition={{ duration: 0.3, ease: "easeOut" }}
+                        className="ml-8 mb-2 mt-0.5 rounded-lg border border-[#252525] bg-[#0d0d0d] overflow-hidden shadow-lg"
+                      >
+                        <div className="divide-y divide-[#1a1a1a]">
+                          <motion.div className="bg-[#0d0d0d]">
+                            <div className="px-3 py-1.5 bg-[#141414] border-b border-[#1a1a1a] flex items-center gap-2">
+                              <FileCode size={12} className="text-[#3b82f6]" />
+                              <span className="text-[11px] font-mono text-[#8a8a8a]">{matchingFile[0]}</span>
+                            </div>
+                            <pre className="p-2.5 font-mono text-[11px] leading-relaxed overflow-x-auto max-h-[120px] text-[#c9d1d9] whitespace-pre-wrap bg-[#0a0a0a] custom-scrollbar">
+                              {matchingFile[1].code.split('\n').slice(0, 15).join('\n')}
+                              {matchingFile[1].code.split('\n').length > 15 && '\n...'}
+                            </pre>
+                          </motion.div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              );
+            })}
+          </AnimatePresence>
         </div>
       )}
     </div>
@@ -162,9 +247,15 @@ export function VibeCoder() {
   ]);
   const [isLoading, setIsLoading] = useState(false);
   const [isFixingError, setIsFixingError] = useState(false);
-  const [generationSteps, setGenerationSteps] = useState<string[]>([]);
+  const [generationSteps, setGenerationSteps] = useState<(string | { text: string, failed?: boolean })[]>([]);
+  const [stepHistory, setStepHistory] = useState<(string | { text: string, failed?: boolean })[][]>([]);
+  const currentStepsRef = useRef<(string | { text: string, failed?: boolean })[]>([]);
   const [autoFixCount, setAutoFixCount] = useState(0);
   const lastErrorRef = useRef<string>('');
+
+  useEffect(() => {
+    currentStepsRef.current = generationSteps;
+  }, [generationSteps]);
 
   const [files, setFiles] = useState<Record<string, { code: string, language: string, icon: React.ElementType, color: string }>>({});
   const [debouncedFiles, setDebouncedFiles] = useState<Record<string, { code: string, language: string, icon: React.ElementType, color: string }>>({});
@@ -193,9 +284,19 @@ export function VibeCoder() {
         if (errorMsg !== lastErrorRef.current && autoFixCount < 3) {
           lastErrorRef.current = errorMsg;
           setAutoFixCount(prev => prev + 1);
-          if (handleSendRef.current) {
-            handleSendRef.current(`I encountered this error in the preview: ${errorMsg}. Please fix it by removing or replacing the missing import.`, true);
-          }
+          
+          // Add the error to the current checklist
+          setGenerationSteps(prev => [...prev, { text: 'Preview error', failed: true }]);
+          
+          // Wait a bit then spawn the new checklist for fixing
+          setTimeout(() => {
+            setStepHistory(prev => [...prev, [...currentStepsRef.current]]);
+            setGenerationSteps(['Fixing preview error']);
+
+            if (handleSendRef.current) {
+              handleSendRef.current('I encountered this error in the preview: ' + errorMsg + '. Please fix it by removing or replacing the missing import.', true);
+            }
+          }, 1000);
         }
       }
     };
@@ -204,7 +305,7 @@ export function VibeCoder() {
   }, [isLoading, autoFixCount]);
 
   const getPreviewHtml = () => {
-    let html = debouncedFiles['index.html']?.code || `<!DOCTYPE html>
+    const indexHtml = debouncedFiles['index.html']?.code || `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -216,169 +317,142 @@ export function VibeCoder() {
   <div id="root"></div>
 </body>
 </html>`;
-    
-    const scrollbarStyle = `<style>
-      ::-webkit-scrollbar { height: 12px; width: 12px; }
-      ::-webkit-scrollbar-track { background: #f8f9fa; }
-      ::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 6px; border: 3px solid #f8f9fa; }
-      ::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
-      body { overflow-x: auto !important; overflow-y: auto !important; }
-    </style>`;
-    
-    if (html.includes('</head>')) {
-      html = html.replace('</head>', `${scrollbarStyle}\n</head>`);
-    } else {
-      html = `${scrollbarStyle}\n${html}`;
-    }
-    
-    // Inject CSS files
-    const cssFiles = Object.entries(debouncedFiles).filter(([name]) => name.endsWith('.css'));
-    if (cssFiles.length > 0) {
-      const styles = cssFiles.map(([, file]) => `<style>\n${file.code}\n</style>`).join('\n');
-      if (html.includes('</head>')) {
-        html = html.replace('</head>', `${styles}\n</head>`);
-      } else {
-        html = `${styles}\n${html}`;
-      }
-    }
-    
-    // Inject JS files
-    const jsFiles = Object.entries(debouncedFiles).filter(([name]) => name.endsWith('.js') || name.endsWith('.jsx') || name.endsWith('.ts') || name.endsWith('.tsx'));
-    if (jsFiles.length > 0) {
-      const hasReact = jsFiles.some(([name, file]) => 
-        name.endsWith('.jsx') || name.endsWith('.tsx') || file.code.includes('react')
-      );
 
-      let reactScripts = '';
-      if (hasReact) {
-        reactScripts = `
-          <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-          <script type="importmap">
-            {
-              "imports": {
-                "react": "https://esm.sh/react@18?dev",
-                "react-dom": "https://esm.sh/react-dom@18?dev",
-                "react-dom/client": "https://esm.sh/react-dom@18/client?dev",
-                "lucide-react": "https://esm.sh/lucide-react?dev",
-                "framer-motion": "https://esm.sh/framer-motion?dev",
-                "recharts": "https://esm.sh/recharts?dev",
-                "clsx": "https://esm.sh/clsx?dev",
-                "tailwind-merge": "https://esm.sh/tailwind-merge?dev",
-                "next-themes": "https://esm.sh/next-themes?dev",
-                "class-variance-authority": "https://esm.sh/class-variance-authority?dev",
-                "@radix-ui/react-slot": "https://esm.sh/@radix-ui/react-slot?dev",
-                "@radix-ui/react-dialog": "https://esm.sh/@radix-ui/react-dialog?dev",
-                "@radix-ui/react-dropdown-menu": "https://esm.sh/@radix-ui/react-dropdown-menu?dev",
-                "@radix-ui/react-popover": "https://esm.sh/@radix-ui/react-popover?dev",
-                "@radix-ui/react-tooltip": "https://esm.sh/@radix-ui/react-tooltip?dev",
-                "@radix-ui/react-tabs": "https://esm.sh/@radix-ui/react-tabs?dev",
-                "@radix-ui/react-accordion": "https://esm.sh/@radix-ui/react-accordion?dev",
-                "@radix-ui/react-avatar": "https://esm.sh/@radix-ui/react-avatar?dev",
-                "@radix-ui/react-checkbox": "https://esm.sh/@radix-ui/react-checkbox?dev",
-                "@radix-ui/react-label": "https://esm.sh/@radix-ui/react-label?dev",
-                "@radix-ui/react-radio-group": "https://esm.sh/@radix-ui/react-radio-group?dev",
-                "@radix-ui/react-select": "https://esm.sh/@radix-ui/react-select?dev",
-                "@radix-ui/react-slider": "https://esm.sh/@radix-ui/react-slider?dev",
-                "@radix-ui/react-switch": "https://esm.sh/@radix-ui/react-switch?dev",
-                "@radix-ui/react-toast": "https://esm.sh/@radix-ui/react-toast?dev",
-                "@radix-ui/react-scroll-area": "https://esm.sh/@radix-ui/react-scroll-area?dev",
-                "@radix-ui/react-separator": "https://esm.sh/@radix-ui/react-separator?dev",
-                "react-router-dom": "https://esm.sh/react-router-dom?dev",
-                "date-fns": "https://esm.sh/date-fns?dev",
-                "zod": "https://esm.sh/zod?dev",
-                "react-hook-form": "https://esm.sh/react-hook-form?dev",
-                "@hookform/resolvers/zod": "https://esm.sh/@hookform/resolvers/zod?dev",
-                "react-icons/": "https://esm.sh/react-icons/"
+    // Create a virtual file system for the iframe
+    const fileSystem: Record<string, string> = {};
+    Object.entries(debouncedFiles).forEach(([name, file]) => {
+      fileSystem[name] = file.code;
+    });
+
+    const previewScript = `
+      <script type="importmap">
+        {
+          "imports": {
+            "react": "https://esm.sh/react@18?dev",
+            "react-dom": "https://esm.sh/react-dom@18?dev",
+            "react-dom/client": "https://esm.sh/react-dom@18/client?dev",
+            "lucide-react": "https://esm.sh/lucide-react?dev",
+            "framer-motion": "https://esm.sh/framer-motion?dev",
+            "recharts": "https://esm.sh/recharts?dev",
+            "clsx": "https://esm.sh/clsx?dev",
+            "tailwind-merge": "https://esm.sh/tailwind-merge?dev",
+            "next-themes": "https://esm.sh/next-themes?dev",
+            "class-variance-authority": "https://esm.sh/class-variance-authority?dev",
+            "@radix-ui/react-slot": "https://esm.sh/@radix-ui/react-slot?dev",
+            "@radix-ui/react-dialog": "https://esm.sh/@radix-ui/react-dialog?dev",
+            "@radix-ui/react-dropdown-menu": "https://esm.sh/@radix-ui/react-dropdown-menu?dev",
+            "@radix-ui/react-popover": "https://esm.sh/@radix-ui/react-popover?dev",
+            "@radix-ui/react-tooltip": "https://esm.sh/@radix-ui/react-tooltip?dev",
+            "@radix-ui/react-tabs": "https://esm.sh/@radix-ui/react-tabs?dev",
+            "@radix-ui/react-accordion": "https://esm.sh/@radix-ui/react-accordion?dev",
+            "@radix-ui/react-avatar": "https://esm.sh/@radix-ui/react-avatar?dev",
+            "@radix-ui/react-checkbox": "https://esm.sh/@radix-ui/react-checkbox?dev",
+            "@radix-ui/react-label": "https://esm.sh/@radix-ui/react-label?dev",
+            "@radix-ui/react-radio-group": "https://esm.sh/@radix-ui/react-radio-group?dev",
+            "@radix-ui/react-select": "https://esm.sh/@radix-ui/react-select?dev",
+            "@radix-ui/react-slider": "https://esm.sh/@radix-ui/react-slider?dev",
+            "@radix-ui/react-switch": "https://esm.sh/@radix-ui/react-switch?dev",
+            "@radix-ui/react-toast": "https://esm.sh/@radix-ui/react-toast?dev",
+            "@radix-ui/react-scroll-area": "https://esm.sh/@radix-ui/react-scroll-area?dev",
+            "@radix-ui/react-separator": "https://esm.sh/@radix-ui/react-separator?dev",
+            "react-router-dom": "https://esm.sh/react-router-dom@6?dev",
+            "date-fns": "https://esm.sh/date-fns?dev",
+            "zod": "https://esm.sh/zod?dev",
+            "react-hook-form": "https://esm.sh/react-hook-form?dev",
+            "@hookform/resolvers/zod": "https://esm.sh/@hookform/resolvers/zod?dev",
+            "react-icons/": "https://esm.sh/react-icons/"
+          }
+        }
+      </script>
+      <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+      <script>
+        // Error handling
+        window.addEventListener('error', function(event) {
+          const msg = event.message || (event.error && event.error.message) || 'Unknown Error';
+          window.parent.postMessage({ type: 'preview_error', error: msg }, '*');
+        });
+        window.addEventListener('unhandledrejection', function(event) {
+          const msg = (event.reason && event.reason.message) || event.reason || 'Unhandled Promise Rejection';
+          window.parent.postMessage({ type: 'preview_error', error: msg }, '*');
+        });
+
+        // Virtual File System
+        const files = ${JSON.stringify(fileSystem)};
+        
+        // Babel configuration
+        Babel.registerPreset('env', {
+          targets: { browsers: ['last 2 versions'] }
+        });
+
+        async function run() {
+          try {
+            const entryFile = Object.keys(files).find(f => f.includes('main') || f.includes('index') || f.includes('App')) || Object.keys(files)[0];
+            if (!entryFile) return;
+
+            const transformedFiles = {};
+            for (const [name, code] of Object.entries(files)) {
+              if (name.endsWith('.css')) {
+                const style = document.createElement('style');
+                style.textContent = code;
+                document.head.appendChild(style);
+                continue;
+              }
+              
+              if (name.endsWith('.js') || name.endsWith('.jsx') || name.endsWith('.ts') || name.endsWith('.tsx')) {
+                const result = Babel.transform(code, {
+                  presets: ['env', ['react', { runtime: 'automatic' }], 'typescript'],
+                  filename: name
+                });
+                transformedFiles[name] = result.code;
               }
             }
-          </script>
-        `;
-      }
 
-      // Combine all JS/TS into one script to avoid import issues between local files
-      // We strip out local imports (e.g. import { App } from './App')
-      let combinedCode = '';
-      
-      // Sort files so index/main are at the end
-      const sortedJsFiles = [...jsFiles].sort(([nameA], [nameB]) => {
-        const isMainA = nameA.includes('index') || nameA.includes('main') || nameA.includes('App');
-        const isMainB = nameB.includes('index') || nameB.includes('main') || nameB.includes('App');
-        if (isMainA && !isMainB) return 1;
-        if (!isMainA && isMainB) return -1;
-        return 0;
-      });
-
-      sortedJsFiles.forEach(([name, file]) => {
-        let code = file.code;
-        // Remove local imports
-        code = code.replace(/import\s+[\s\S]*?\s+from\s+['"](\.\/|\.\.\/|@\/|components\/|lib\/|hooks\/|utils\/|ui\/).*?['"];?/g, '');
-        // Remove side-effect local imports (e.g. import './index.css')
-        code = code.replace(/import\s+['"](\.\/|\.\.\/|@\/|components\/|lib\/|hooks\/|utils\/|ui\/).*?['"];?/g, '');
-        // Remove all .css imports
-        code = code.replace(/import\s+['"].*?\.css['"];?/g, '');
-        // Remove export { ... } statements
-        code = code.replace(/export\s+\{[\s\S]*?\}(?:\s+from\s+['"].*?['"])?;?/g, '');
-        // Remove export * from statements
-        code = code.replace(/export\s+\*\s+from\s+['"].*?['"];?/g, '');
-        // Handle export default function/class
-        code = code.replace(/export\s+default\s+(function|class)\s+([A-Za-z0-9_]+)/g, '$1 $2');
-        // Handle export default variable
-        code = code.replace(/export\s+default\s+([A-Za-z0-9_]+);?/g, 'window.__vibeApp = $1;');
-        // Remove remaining export keywords
-        code = code.replace(/export\s+default\s+/g, '');
-        code = code.replace(/export\s+const\s+/g, 'const ');
-        code = code.replace(/export\s+function\s+/g, 'function ');
-        code = code.replace(/export\s+class\s+/g, 'class ');
-        code = code.replace(/export\s+let\s+/g, 'let ');
-        code = code.replace(/export\s+/g, '');
-        combinedCode += `\n// --- ${name} ---\n${code}\n`;
-      });
-
-      const errorCatchingScript = `
-        <script>
-          window.addEventListener('error', function(event) {
-            const msg = event.message || (event.error && event.error.message) || 'Unknown Error';
-            document.body.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace; background: #0a0a0a; height: 100vh; width: 100vw; box-sizing: border-box;"><h3>Runtime Error</h3><p>' + msg + '</p><pre style="margin-top: 10px; opacity: 0.7; white-space: pre-wrap;">' + (event.error ? event.error.stack : '') + '</pre></div>';
-            window.parent.postMessage({ type: 'preview_error', error: msg }, '*');
-          }, true);
-          window.addEventListener('unhandledrejection', function(event) {
-            const msg = (event.reason && event.reason.message) || event.reason || 'Unhandled Promise Rejection';
-            document.body.innerHTML = '<div style="color: #ef4444; padding: 20px; font-family: monospace; background: #0a0a0a; height: 100vh; width: 100vw; box-sizing: border-box;"><h3>Unhandled Promise Rejection</h3><p>' + msg + '</p></div>';
-            window.parent.postMessage({ type: 'preview_error', error: msg }, '*');
-          });
-        </script>
-      `;
-
-      if (hasReact) {
-        combinedCode += `\n\nif (typeof App !== 'undefined' && !window.__vibeApp) window.__vibeApp = App;\nelse if (typeof Main !== 'undefined' && !window.__vibeApp) window.__vibeApp = Main;\nelse if (typeof Index !== 'undefined' && !window.__vibeApp) window.__vibeApp = Index;\nelse if (typeof Dashboard !== 'undefined' && !window.__vibeApp) window.__vibeApp = Dashboard;\nelse if (typeof Page !== 'undefined' && !window.__vibeApp) window.__vibeApp = Page;\n`;
-      }
-
-      const scriptType = hasReact ? 'type="text/babel" data-type="module" data-presets="react,typescript"' : 'type="module"';
-      let finalScript = `${errorCatchingScript}\n${reactScripts}\n<script ${scriptType}>\n${combinedCode}\n</script>`;
-      
-      if (hasReact) {
-        finalScript += `\n<script type="text/babel" data-type="module">
-          import React from 'react';
-          import { createRoot } from 'react-dom/client';
-          setTimeout(() => {
-            const RootComponent = window.__vibeApp || (() => React.createElement('div', {className: 'p-4 text-red-500'}, 'Error: Could not find main component (App, Main, or Index) to render.'));
-            const rootElement = document.getElementById('root');
-            if (rootElement && !rootElement.hasChildNodes()) {
-              const root = createRoot(rootElement);
-              root.render(React.createElement(RootComponent));
+            const blobUrls = {};
+            for (const [name, code] of Object.entries(transformedFiles)) {
+              const blob = new Blob([code], { type: 'application/javascript' });
+              const url = URL.createObjectURL(blob);
+              blobUrls[name] = url;
             }
-          }, 100);
-        </script>`;
-      }
-      
-      if (html.includes('</body>')) {
-        html = html.replace('</body>', `${finalScript}\n</body>`);
-      } else {
-        html = `${html}\n${finalScript}`;
-      }
-    }
-    
-    return html;
+
+            const finalTransformedFiles = {};
+            for (const [name, code] of Object.entries(transformedFiles)) {
+              let fixedCode = code;
+              Object.entries(blobUrls).forEach(([fileName, url]) => {
+                const baseName = fileName.replace(/\.(js|jsx|ts|tsx)$/, '');
+                const importRegex = new RegExp('import\\s+(.*?)\\s+from\\s+["\']\\./' + baseName + '(\\..*?)?["\']', 'g');
+                fixedCode = fixedCode.replace(importRegex, "import $1 from '" + url + "'");
+              });
+              finalTransformedFiles[name] = fixedCode;
+            }
+
+            const entryCode = finalTransformedFiles[entryFile];
+            if (!entryCode) return;
+
+            const script = document.createElement('script');
+            script.type = 'module';
+            script.textContent = entryCode + '\\n' +
+              '\\n' +
+              'import React from \\'react\\';\\n' +
+              'import { createRoot } from \\'react-dom/client\\';\\n' +
+              '\\n' +
+              'const rootElement = document.getElementById(\\'root\\');\\n' +
+              'if (rootElement) {\\n' +
+              '  const root = createRoot(rootElement);\\n' +
+              '  // The entry file should handle its own rendering or we try to find \\'App\\'\\n' +
+              '}\\n';
+            document.body.appendChild(script);
+
+          } catch (err) {
+            console.error('Preview Error:', err);
+            window.parent.postMessage({ type: 'preview_error', error: err.message }, '*');
+          }
+        }
+
+        run();
+      </script>
+    `;
+
+    return indexHtml.replace('</body>', previewScript + '</body>');
   };
 
   const handleCreateFile = () => {
@@ -409,22 +483,22 @@ export function VibeCoder() {
     setNewFileName('');
   };
 
+  const scrollRef = useRef<HTMLDivElement>(null);
+
   const scrollToBottom = () => {
-    setTimeout(() => {
-      const container = messagesEndRef.current?.parentElement?.parentElement;
-      if (container) {
-        container.scrollTo({
-          top: container.scrollHeight,
-          behavior: 'smooth'
-        });
-      }
-    }, 50);
+    if (scrollRef.current) {
+      const { scrollHeight, clientHeight } = scrollRef.current;
+      scrollRef.current.scrollTo({
+        top: scrollHeight - clientHeight,
+        behavior: 'smooth'
+      });
+    }
   };
 
   const handleTerminalSubmit = async (e: React.KeyboardEvent<HTMLInputElement>, commandOverride?: string) => {
     if (e.key === 'Enter') {
       const input = (commandOverride ?? terminalInput).trim();
-      const newHistory = [...terminalHistory, `C:\\Users\\User\\vibe-coder> ${input}`];
+      const newHistory = [...terminalHistory, 'C:/Users/User/vibe-coder> ' + input];
       setTerminalInput('');
       
       if (input.toLowerCase() === 'dir') {
@@ -432,12 +506,12 @@ export function VibeCoder() {
           ' Volume in drive C has no label.',
           ' Volume Serial Number is 1234-5678',
           '',
-          ' Directory of C:\\Users\\User\\vibe-coder',
+          ' Directory of C:/Users/User/vibe-coder',
           '',
           '03/16/2026  10:00 AM    <DIR>          .',
           '03/16/2026  10:00 AM    <DIR>          ..',
-          ...Object.keys(files).map(name => `03/16/2026  10:00 AM             1,024 ${name}`),
-          `               ${Object.keys(files).length} File(s)          ${Object.keys(files).length * 1024} bytes`,
+          ...Object.keys(files).map(name => '03/16/2026  10:00 AM             1,024 ' + name),
+          '               ' + Object.keys(files).length + ' File(s)          ' + (Object.keys(files).length * 1024) + ' bytes',
           '               2 Dir(s)  100,000,000,000 bytes free'
         );
       } else if (input.toLowerCase() === 'cls') {
@@ -446,7 +520,7 @@ export function VibeCoder() {
       } else if (input.startsWith('python ') || input.startsWith('py ')) {
         const filename = input.split(' ')[1];
         if (files[filename]) {
-          newHistory.push(`Running ${filename}...`);
+          newHistory.push('Running ' + filename + '...');
           setTerminalHistory(newHistory);
           setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
           
@@ -484,12 +558,12 @@ export function VibeCoder() {
           setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
           return;
         } else {
-          newHistory.push(`python: can't open file '${filename}': [Errno 2] No such file or directory`);
+          newHistory.push("python: can't open file '" + filename + "': [Errno 2] No such file or directory");
         }
       } else if (input.startsWith('node ')) {
         const filename = input.split(' ')[1];
         if (files[filename]) {
-          newHistory.push(`Running ${filename}...`);
+          newHistory.push('Running ' + filename + '...');
           setTerminalHistory(newHistory);
           setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
           
@@ -514,10 +588,10 @@ export function VibeCoder() {
           setTimeout(() => terminalEndRef.current?.scrollIntoView(), 10);
           return;
         } else {
-          newHistory.push(`node: Cannot find module '${filename}'`);
+          newHistory.push("node: Cannot find module '" + filename + "'");
         }
       } else if (input !== '') {
-        newHistory.push(`'${input}' is not recognized as an internal or external command,`, 'operable program or batch file.');
+        newHistory.push("'" + input + "' is not recognized as an internal or external command,", 'operable program or batch file.');
       }
       newHistory.push('');
       setTerminalHistory(newHistory);
@@ -527,7 +601,7 @@ export function VibeCoder() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, generationSteps, stepHistory]);
 
   handleSendRef.current = async (message: string, isAutoFix = false) => {
     await handleSend(message, isAutoFix);
@@ -538,11 +612,11 @@ export function VibeCoder() {
 
     if (message.startsWith("[Deploy: ")) {
       const actualMessage = message.replace("[Deploy: ", "").slice(0, -1);
-      setMessages([...messages, { role: 'user', content: `Deploying application: ${actualMessage}` }]);
+      setMessages([...messages, { role: 'user', content: 'Deploying application: ' + actualMessage }]);
       setIsLoading(true);
       setGenerationSteps(["Preparing deployment", "Building assets", "Deploying to Vercel"]);
       setTimeout(() => {
-        setMessages(prev => [...prev, { role: 'model', content: "Deployment successful! Your app is live at `https://vibe-coder-app.vercel.app`." }]);
+        setMessages(prev => [...prev, { role: 'model', content: "Deployment successful! Your app is live at https://vibe-coder-app.vercel.app." }]);
         setIsLoading(false);
         setGenerationSteps([]);
       }, 3000);
@@ -551,7 +625,7 @@ export function VibeCoder() {
 
     if (message.startsWith("[Format: ")) {
       const actualMessage = message.replace("[Format: ", "").slice(0, -1);
-      setMessages([...messages, { role: 'user', content: `Formatting code: ${actualMessage}` }]);
+      setMessages([...messages, { role: 'user', content: 'Formatting code: ' + actualMessage }]);
       setIsLoading(true);
       setGenerationSteps(["Running Prettier", "Fixing lint errors", "Formatting complete"]);
       
@@ -569,9 +643,9 @@ export function VibeCoder() {
 
     if (message.startsWith("[Terminal: ")) {
       const actualMessage = message.replace("[Terminal: ", "").slice(0, -1);
-      setMessages([...messages, { role: 'user', content: `Running command: \`${actualMessage}\`` }]);
+      setMessages([...messages, { role: 'user', content: 'Running command: ' + actualMessage }]);
       setIsLoading(true);
-      setGenerationSteps([`Executing ${actualMessage}`, "Processing output"]);
+      setGenerationSteps(['Executing ' + actualMessage, "Processing output"]);
       
       // Simulate running the command in the terminal
       setIsTerminalOpen(true);
@@ -581,7 +655,7 @@ export function VibeCoder() {
         const fakeEvent = { key: 'Enter' } as React.KeyboardEvent<HTMLInputElement>;
         handleTerminalSubmit(fakeEvent, actualMessage);
         
-        setMessages(prev => [...prev, { role: 'model', content: "```bash\n$ " + actualMessage + "\nCommand executed successfully in the terminal.\n```" }]);
+        setMessages(prev => [...prev, { role: 'model', content: 'bash\n$ ' + actualMessage + '\nCommand executed successfully in the terminal.' }]);
         setIsLoading(false);
         setGenerationSteps([]);
       }, 1000);
@@ -593,10 +667,15 @@ export function VibeCoder() {
     }
 
     const newMessages = [...messages, { role: 'user' as const, content: message }];
-    setMessages(newMessages);
+    if (!isAutoFix) {
+      setMessages(newMessages);
+    }
     setInput('');
     setIsLoading(true);
-    setGenerationSteps([]);
+    if (!isAutoFix) {
+      setGenerationSteps([]);
+      setStepHistory([]);
+    }
 
     try {
       let fullResponse = '';
@@ -605,7 +684,7 @@ export function VibeCoder() {
       const stream = streamChat(
         messages, 
         message, 
-        "You are an expert AI software engineer. The user wants to build a web application. You MUST output multiple files to build a complete, production-ready application.\nFirst, provide a JSON array of the specific tasks you will perform to build this app, wrapped in a ```json:plan block. For example:\n```json:plan\n[\"Setup application structure\", \"Implement Tailwind layout for dashboard\", \"Create interactive components\", \"Add dark mode toggle\"]\n```\nThen, output each file's code wrapped in a markdown block with the language AND filename specified like this: ```html:index.html ...code... ``` or ```css:styles.css ...code... ``` or ```js:script.js ...code... ```. Go above and beyond to make it polished and professional. ALWAYS generate projects with an iOS-like, professional, minimalistic, and smooth design (unless told a certain theme). Use smooth animations, clean typography, and subtle shadows. IMPORTANT: The preview environment supports React, Tailwind, framer-motion, lucide-react, and recharts via ESM imports. You can use standard ES modules (e.g., `import React from 'react'`). Do NOT include CDN links in index.html, they are injected automatically. CRITICAL: Do NOT output any conversational text, explanations, or markdown outside of the code blocks. Just output the plan block and the code blocks.", 
+        "You are an expert AI software engineer. The user wants to build a web application. You MUST output multiple files to build a complete, production-ready application.\nFirst, provide a JSON array of the specific tasks you will perform to build this app, wrapped in a json:plan block. For example:\njson:plan\n[\"Setup application structure\", \"Implement Tailwind layout for dashboard\", \"Create interactive components\", \"Add dark mode toggle\"]\n\nThen, output each file's code wrapped in a markdown block with the language AND filename specified like this: html:index.html ...code...  or css:styles.css ...code...  or js:script.js ...code... . Go above and beyond to make it polished and professional. ALWAYS generate projects with an iOS-like, professional, minimalistic, and smooth design (unless told a certain theme). Use smooth animations, clean typography, and subtle shadows. IMPORTANT: The preview environment supports React, Tailwind, framer-motion, lucide-react, and recharts via ESM imports. You can use standard ES modules (e.g., import React from 'react'). Do NOT include CDN links in index.html, they are injected automatically. CRITICAL: Do NOT output any conversational text, explanations, or markdown outside of the code blocks. Just output the plan block and the code blocks.", 
         false, 
         'medium'
       );
@@ -621,7 +700,7 @@ export function VibeCoder() {
         });
 
         if (!parsedPlan) {
-          const planRegex = /```json:plan\n([\s\S]*?)\n```/;
+          const planRegex = new RegExp('json:plan\\n([\\s\\S]*?)\\n');
           const planMatch = fullResponse.match(planRegex);
           if (planMatch) {
             try {
@@ -637,7 +716,7 @@ export function VibeCoder() {
         }
         
         // Extract all code blocks
-        const codeBlockRegex = /```(\w+)?(?:[:|](\S+))?\n([\s\S]*?)(?:```|$)/g;
+        const codeBlockRegex = new RegExp('(\\w+)?(?:[:|](\\S+))?\\n([\\s\\S]*?)(?:$)', 'g');
         let match;
         const extractedFiles: Record<string, { code: string, language: string, icon: React.ElementType, color: string }> = {};
         
@@ -679,7 +758,7 @@ export function VibeCoder() {
               icon = FileJson;
               color = 'text-green-400';
             } else {
-              baseName = `file.${lang}`;
+              baseName = 'file.' + lang;
             }
           } else {
             if (baseName.endsWith('.html')) { icon = HtmlIcon; color = ''; }
@@ -695,7 +774,7 @@ export function VibeCoder() {
           while (extractedFiles[fileName]) {
             const parts = baseName.split('.');
             const ext = parts.pop();
-            fileName = `${parts.join('.')}${counter}.${ext}`;
+            fileName = parts.join('.') + counter + '.' + ext;
             counter++;
           }
           
@@ -727,7 +806,7 @@ export function VibeCoder() {
       
       {/* --- LEFT SIDEBAR (Chat History) --- */}
       <div className="w-[380px] flex flex-col border-r border-[#1a1a1a] bg-[#0a0a0a] shrink-0">
-        <div className="flex-1 overflow-y-auto custom-scrollbar relative">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto custom-scrollbar relative">
           <div className="p-4 pt-6 space-y-6 pb-6">
             {messages.map((msg, idx) => (
               <div key={idx} className={cn("flex flex-col space-y-2", msg.role === 'user' ? "items-end mb-8" : "items-start")}>
@@ -750,24 +829,40 @@ export function VibeCoder() {
                         animate={{ opacity: 1, y: 0 }}
                         className="flex items-center gap-3 py-2"
                       >
-                        <motion.div
-                          animate={{ rotate: 360 }}
-                          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                        >
-                          <Loader2 size={16} className="text-[#3b82f6]" />
-                        </motion.div>
-                        <TextShimmer className="text-[14px] font-medium tracking-wide">Thinking deeply...</TextShimmer>
+                        <TextShimmer duration={4} className="text-[14px] font-normal tracking-wide text-[#a3a3a3]">Thinking deeply...</TextShimmer>
                       </motion.div>
                     )}
                     
-                    {idx === messages.length - 1 && generationSteps.length > 0 && (
-                      <div className="py-2">
-                        <GenerationProgress isStreaming={isLoading} steps={generationSteps} />
+                    {idx === messages.length - 1 && (generationSteps.length > 0 || stepHistory.length > 0) && (
+                      <div className="py-2 space-y-4">
+                        <AnimatePresence mode="popLayout">
+                          {stepHistory.map((steps, i) => (
+                            <motion.div
+                              key={'history-' + i}
+                              initial={{ opacity: 0, height: 0, filter: "blur(10px)" }}
+                              animate={{ opacity: 1, height: 'auto', filter: "blur(0px)" }}
+                              exit={{ opacity: 0, height: 0, filter: "blur(10px)" }}
+                              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                            >
+                              <GenerationProgress isStreaming={false} steps={steps} files={files} />
+                            </motion.div>
+                          ))}
+                          {generationSteps.length > 0 && (
+                            <motion.div
+                              key="current-steps"
+                              initial={{ opacity: 0, height: 0, filter: "blur(10px)" }}
+                              animate={{ opacity: 1, height: 'auto', filter: "blur(0px)" }}
+                              transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                            >
+                              <GenerationProgress isStreaming={isLoading} steps={generationSteps} files={files} />
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     )}
 
                     {(() => {
-                      const displayContent = msg.content.replace(/```[\s\S]*?(?:```|$)/g, '').trim();
+                      const displayContent = msg.content.replace(new RegExp('[\\s\\S]*?(?:$)', 'g'), '').trim();
                       return displayContent ? (
                         <div className="text-[14px] leading-[1.6] text-[#e5e5e5] prose prose-invert max-w-none prose-pre:bg-[#111] prose-pre:border prose-pre:border-[#222]">
                           <ChatMessage content={displayContent} />
@@ -886,7 +981,7 @@ export function VibeCoder() {
                 }}
                 onRemove={(e) => {
                   e.stopPropagation();
-                  if (confirm(`Are you sure you want to delete ${filename}?`)) {
+                  if (confirm('Are you sure you want to delete ' + filename + '?')) {
                     setFiles(prev => {
                       const newFiles = { ...prev };
                       delete newFiles[filename];
@@ -976,7 +1071,7 @@ export function VibeCoder() {
                        <ShortcutRow label="Go to File" keys={['Ctrl', 'P']} />
                        <ShortcutRow label="Find in Files" keys={['Ctrl', 'Shift', 'F']} />
                        <ShortcutRow label="Command Palette" keys={['Ctrl', 'Shift', 'P']} />
-                       <ShortcutRow label="Terminal" keys={['Ctrl', '`']} />
+                       <ShortcutRow label="Terminal" keys={['Ctrl', '\u0060']} />
                     </div>
                  </div>
                </div>
@@ -1005,7 +1100,7 @@ export function VibeCoder() {
                             {
                               label: 'print',
                               kind: monaco.languages.CompletionItemKind.Function,
-                              insertText: 'print(${1:value})',
+                              insertText: "print(${1:value})",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Prints the values to a stream, or to sys.stdout by default.',
                               range: range
@@ -1013,7 +1108,7 @@ export function VibeCoder() {
                             {
                               label: 'def',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'def ${1:name}(${2:args}):\n\t${3:pass}',
+                              insertText: "def ${1:name}(${2:args}):\n\t${3:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Define a function',
                               range: range
@@ -1021,7 +1116,7 @@ export function VibeCoder() {
                             {
                               label: 'class',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'class ${1:Name}:\n\tdef __init__(self):\n\t\t${2:pass}',
+                              insertText: "class ${1:Name}:\n\tdef __init__(self):\n\t\t${2:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Define a class',
                               range: range
@@ -1029,7 +1124,7 @@ export function VibeCoder() {
                             {
                               label: 'import',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'import ${1:module}',
+                              insertText: "import ${1:module}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Import a module',
                               range: range
@@ -1037,7 +1132,7 @@ export function VibeCoder() {
                             {
                               label: 'from',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'from ${1:module} import ${2:name}',
+                              insertText: "from ${1:module} import ${2:name}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Import a specific name from a module',
                               range: range
@@ -1045,7 +1140,7 @@ export function VibeCoder() {
                             {
                               label: 'if',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'if ${1:condition}:\n\t${2:pass}',
+                              insertText: "if ${1:condition}:\n\t${2:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'If statement',
                               range: range
@@ -1053,7 +1148,7 @@ export function VibeCoder() {
                             {
                               label: 'for',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'for ${1:item} in ${2:iterable}:\n\t${3:pass}',
+                              insertText: "for ${1:item} in ${2:iterable}:\n\t${3:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'For loop',
                               range: range
@@ -1061,7 +1156,7 @@ export function VibeCoder() {
                             {
                               label: 'while',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'while ${1:condition}:\n\t${2:pass}',
+                              insertText: "while ${1:condition}:\n\t${2:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'While loop',
                               range: range
@@ -1069,7 +1164,7 @@ export function VibeCoder() {
                             {
                               label: 'try',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:e}:\n\t${4:pass}',
+                              insertText: "try:\n\t${1:pass}\nexcept ${2:Exception} as ${3:e}:\n\t${4:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Try-except block',
                               range: range
@@ -1077,7 +1172,7 @@ export function VibeCoder() {
                             {
                               label: 'with',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'with ${1:expression} as ${2:name}:\n\t${3:pass}',
+                              insertText: "with ${1:expression} as ${2:name}:\n\t${3:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'With statement',
                               range: range
@@ -1085,7 +1180,7 @@ export function VibeCoder() {
                             {
                               label: 'return',
                               kind: monaco.languages.CompletionItemKind.Keyword,
-                              insertText: 'return ${1:value}',
+                              insertText: "return ${1:value}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Return statement',
                               range: range
@@ -1093,7 +1188,7 @@ export function VibeCoder() {
                             {
                               label: '__init__',
                               kind: monaco.languages.CompletionItemKind.Method,
-                              insertText: 'def __init__(self${1:, args}):\n\t${2:pass}',
+                              insertText: "def __init__(self${1:, args}):\n\t${2:pass}",
                               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
                               documentation: 'Initialize a class instance',
                               range: range
@@ -1269,12 +1364,12 @@ export function VibeCoder() {
            {/* Terminal Overlay */}
            {isTerminalOpen && (
              <div className="absolute bottom-0 left-0 right-0 h-64 bg-[#0C0C0C] border-t border-[#1a1a1a] flex flex-col z-20" style={{ fontFamily: 'Consolas, "Courier New", monospace' }}>
-               <div className="flex items-center justify-between px-4 py-2 bg-white text-black">
+               <div className="flex items-center justify-between px-2 py-1 bg-[#1a1a1a] text-[#cccccc] border-b border-[#333]">
                  <div className="flex items-center gap-2">
-                   <TerminalIcon />
-                   <span className="text-[12px] font-semibold">Command Prompt</span>
+                   <TerminalIcon size={14} />
+                   <span className="text-[12px]">Command Prompt</span>
                  </div>
-                 <button onClick={() => setIsTerminalOpen(false)} className="text-black hover:bg-[#e81123] hover:text-white px-3 py-1 transition-colors">
+                 <button onClick={() => setIsTerminalOpen(false)} className="hover:bg-[#e81123] hover:text-white px-3 py-1 transition-colors">
                    <X size={14} />
                  </button>
                </div>
@@ -1306,29 +1401,29 @@ export function VibeCoder() {
         </div>
       </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @keyframes terminal-blink {
-          0%, 49.9% { opacity: 1; }
-          50%, 100% { opacity: 0; }
-        }
-        .terminal-cursor {
-          animation: terminal-blink 1s infinite;
-        }
-        .custom-scrollbar::-webkit-scrollbar {
-          width: 5px;
-          height: 5px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb {
-          background: #1f1f1f;
-          border-radius: 10px;
-        }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-          background: #262626;
-        }
-      `}} />
+      <style dangerouslySetInnerHTML={{ __html: 
+        '@keyframes terminal-blink {\n' +
+        '  0%, 49.9% { opacity: 1; }\n' +
+        '  50%, 100% { opacity: 0; }\n' +
+        '}\n' +
+        '.terminal-cursor {\n' +
+        '  animation: terminal-blink 1s infinite;\n' +
+        '}\n' +
+        '.custom-scrollbar::-webkit-scrollbar {\n' +
+        '  width: 5px;\n' +
+        '  height: 5px;\n' +
+        '}\n' +
+        '.custom-scrollbar::-webkit-scrollbar-track {\n' +
+        '  background: transparent;\n' +
+        '}\n' +
+        '.custom-scrollbar::-webkit-scrollbar-thumb {\n' +
+        '  background: #1f1f1f;\n' +
+        '  border-radius: 10px;\n' +
+        '}\n' +
+        '.custom-scrollbar::-webkit-scrollbar-thumb:hover {\n' +
+        '  background: #262626;\n' +
+        '}\n'
+      }} />
     </div>
   );
 }
