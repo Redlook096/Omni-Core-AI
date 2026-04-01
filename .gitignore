@@ -12,6 +12,12 @@ dist
 dist-ssr
 *.local
 
+# Vibe Coder terminal sandbox (mirrored user files; do not commit)
+.vibe-sandbox
+
+# Local reference clone (not part of app)
+.vibe-dashboard-ref
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

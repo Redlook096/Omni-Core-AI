@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, createPartFromBase64, createPartFromText } from "@google/genai";
 import { DEFAULT_SYSTEM_INSTRUCTION } from "./constants";
 
 export async function generateTitle(message: string): Promise<string> {
@@ -93,6 +93,55 @@ Return ONLY a valid JSON object with a "suggestions" array containing 3 objects 
   return [];
 }
 
+/** Three starter prompts for Vibe Coder empty state (AI-generated; fallback handled by caller). */
+export async function generateVibeQuickPrompts(): Promise<string[]> {
+  try {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    const response = await ai.models.generateContent({
+      model: 'gemini-3-flash-preview',
+      contents: `Generate exactly 3 starter prompts for a React + TypeScript + Tailwind app (framer-motion, lucide, recharts).
+
+Rules:
+- ONE short sentence each, max 120 characters (hard limit).
+- Format: "<Product or screen>: feature, feature, feature." — concrete UI only, no fluff, no quotes.
+- Vary themes (dashboard, landing, admin tool, onboarding, marketing).
+- No words like "Build" or "Create" at the start; jump straight to the product.
+
+Return ONLY valid JSON: {"prompts":["...","...","..."]}`,
+      config: {
+        temperature: 0.88,
+        responseMimeType: 'application/json',
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            prompts: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+            },
+          },
+          required: ['prompts'],
+        },
+      },
+    });
+    const text = response.text?.trim();
+    if (!text) return [];
+    const parsed = JSON.parse(text) as { prompts?: string[] };
+    if (Array.isArray(parsed.prompts) && parsed.prompts.length >= 3) {
+      return parsed.prompts
+        .slice(0, 3)
+        .map((p) => {
+          const s = String(p).trim();
+          if (!s) return '';
+          return s.length > 125 ? `${s.slice(0, 122)}…` : s;
+        })
+        .filter(Boolean);
+    }
+  } catch (error) {
+    console.error('Error generating Vibe quick prompts:', error);
+  }
+  return [];
+}
+
 export async function detectCodeIntent(message: string): Promise<boolean> {
   try {
     const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
@@ -111,12 +160,16 @@ export async function detectCodeIntent(message: string): Promise<boolean> {
   }
 }
 
+/** Inline images for the current user turn only (history stays text). */
+export type StreamChatImageAttachment = { mimeType: string; dataBase64: string };
+
 export async function* streamChat(
   history: { role: 'user' | 'model'; content: string }[],
   newMessage: string,
   customPersona?: string,
   isRegeneration: boolean = false,
-  creativityLevel: 'low' | 'medium' | 'high' = 'medium'
+  creativityLevel: 'low' | 'medium' | 'high' = 'medium',
+  imageAttachments?: StreamChatImageAttachment[],
 ): AsyncGenerator<string> {
   const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
@@ -128,7 +181,12 @@ export async function* streamChat(
     finalSystemInstruction += `\n\n[INSTRUCTION]: Regenerate this response. Change the structure or angle. If the previous answer was too long, make this one concise. If it was too short, expand.`;
   }
 
-  finalSystemInstruction += `\n\n**CRITICAL:** If the user's message starts with \`[Canvas: \`, you MUST output ONLY the code block, followed by a very brief, single-line comment or summary underneath it. Do NOT output any conversational filler text before the code block. Just start immediately with the \`\`\`language ... \`\`\` block.`;
+  finalSystemInstruction += `\n\n**CRITICAL — Canvas mode (\`[Canvas: ...\`):**
+- Output **one** fenced code block first (then optional one-line summary). No filler before the fence.
+- **Websites & apps** (HTML, CSS, JavaScript, TypeScript, JSX, TSX): use the matching fence language. The app shows a **live browser preview** for these.
+- **Python** and other non-web languages: use a \`\`\`python\`\`\` fenced block (or the correct language tag). Execution runs in the **terminal** (remote runner), **not** in a browser preview.
+- Make the snippet **complete and runnable**; fix imports and syntax so it executes without errors.
+- IMPORTANT (game UI): Do **not** include a mission checklist / completed-task list UI (checkboxes with step text) and do **not** include an "Instruction:" footer block. Keep the canvas UI minimal (controls only).`;
 
   finalSystemInstruction += `\n\nCRITICAL DESIGN RULES TO AVOID AI TROPES:
 1. Color palette: Pick 1 dominant color, 1 accent, 1 neutral. Use that combo everywhere. Avoid high-saturation pink + purple unless specifically requested. Use muted earth tones for cozy/vintage, black + electric cyan/magenta for cyber/tech.
@@ -169,11 +227,136 @@ export async function* streamChat(
     })),
   });
 
-  const result = await chat.sendMessageStream({ message: newMessage });
+  const message =
+    imageAttachments && imageAttachments.length > 0
+      ? [
+          createPartFromText(newMessage),
+          ...imageAttachments.map((img) => createPartFromBase64(img.dataBase64, img.mimeType)),
+        ]
+      : newMessage;
+
+  const result = await chat.sendMessageStream({ message });
 
   for await (const chunk of result) {
-    if (chunk.text) {
-      yield chunk.text;
+    const t = chunk?.text;
+    if (t != null && t !== '') {
+      yield typeof t === 'string' ? t : String(t);
     }
   }
+}
+
+/** Natural-language → faux “execution trace” for the integrated terminal (Ctrl+K). */
+function decodeTerminalOutputEscapes(text: string): string {
+  let out = text;
+
+  // If the model prints escape codes as literal strings (e.g. "\x1b[90m"), convert
+  // them to real ANSI ESC sequences so xterm can render them.
+  out = out.replace(/\\r\\n/g, '\r\n');
+  out = out.replace(/\\r/g, '\r');
+  out = out.replace(/\\n/g, '\n');
+
+  out = out.replace(/\\x1b\[/gi, '\x1b[');
+  out = out.replace(/\\u001b\[/gi, '\x1b[');
+  out = out.replace(/\\e\[/gi, '\x1b[');
+
+  // Normalize newlines to CRLF so line wrapping/alignment matches real shell output.
+  out = out.replace(/\r?\n/g, '\r\n');
+
+  return out;
+}
+
+/** One-line shell command for the active Vibe terminal (real PTY execution). */
+export async function generateVibeShellCommand(
+  instruction: string,
+  shell: 'powershell' | 'cmd' | 'git-bash',
+): Promise<string> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const shellGuide =
+    shell === 'powershell'
+      ? 'Shell: Windows PowerShell. Working directory: C:\\Users\\Luke\\Downloads\\Lyra AI\\.vibe-sandbox. Prefer Get-ChildItem, Get-Content, etc.'
+      : shell === 'cmd'
+        ? 'Shell: cmd.exe. Working directory: C:\\Users\\Luke\\Downloads\\Lyra AI\\.vibe-sandbox. Prefer dir, type, cd.'
+        : 'Shell: Git Bash (MINGW64). Working directory is the .vibe-sandbox under the Lyra AI project. Prefer ls, ls -la, pwd, find. IMPORTANT: The command MUST be a normal prompt command; do NOT invoke `bash`, do NOT use standalone `--` tokens, and do NOT start the command with `-` or `--`. Start with a command like `ls`, `find`, `cat`, or `pwd`.';
+
+  const response = await ai.models.generateContent({
+    model: 'gemini-3-flash-preview',
+    contents: `User intent (natural language):\n${instruction}\n\n${shellGuide}\n\nReply with EXACTLY ONE LINE: the shell command to run. No explanation, no markdown, no backticks, no comments.`,
+    config: { temperature: 0.12 },
+  });
+
+  let text = response.text?.trim() ?? '';
+  text = text.replace(/^[`'"]+|[`'"]+$/g, '');
+  text = text.split(/\r?\n/)[0]?.trim() ?? '';
+  // Strip any accidental prompt fragments the model might include.
+  text = text.replace(/^(PS|C:\\\\).*?>\s*/i, '');
+  text = text.replace(/^(>|\$)\s*/i, '');
+
+  if (shell === 'powershell') {
+    // Keep directory listings compact in the integrated terminal.
+    if (/^Get-ChildItem\b/i.test(text) && !/\|/.test(text)) {
+      text = `${text} | Select-Object Mode,LastWriteTime,Length,Name`;
+    }
+  }
+
+  // Git Bash safety: avoid standalone `--` or leading dash-only tokens that cause bash parse errors.
+  if (shell === 'git-bash') {
+    text = text.replace(/\s+/g, ' ').trim();
+
+    // If it starts with prompt fragments or dash-only junk, pick a safe fallback.
+    if (text === '--' || text.startsWith('--') || text.startsWith('-')) {
+      const tokens = text.split(' ').filter(Boolean);
+      const firstGood = tokens.find((t) => t && !t.startsWith('-'));
+      if (firstGood) {
+        const idx = tokens.indexOf(firstGood);
+        text = tokens.slice(idx).join(' ');
+      } else {
+        return 'ls -la';
+      }
+    }
+
+    // If the final thing still begins with '-' after cleanup, fallback.
+    if (text.startsWith('-')) return 'ls -la';
+
+    // Ensure we don't return the literal '--' token or it-only strings.
+    if (text === '--' || /^-+$/.test(text) || /^--$/.test(text)) return 'ls -la';
+  }
+
+  return text || (shell === 'powershell' ? 'Get-ChildItem -Force' : shell === 'cmd' ? 'dir /a' : 'ls -la');
+}
+
+export async function* streamTerminalAiCommand(
+  instruction: string,
+): AsyncGenerator<string> {
+  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const chat = ai.chats.create({
+    model: 'gemini-3-flash-preview',
+    config: {
+      systemInstruction: `You are Vibe Terminal Core — an advanced orchestration layer whose output is rendered inside a real xterm.js terminal.
+
+The user submits a natural-language INTENT (not a shell command). You must respond with ONLY raw terminal text — NO markdown, NO \`\`\` fences.
+
+Style requirements:
+- Use Windows-style line breaks: each line ends with \\r\\n (carriage return + newline).
+- Use ANSI SGR color codes so the output looks premium: cyan \\x1b[96m for headers, green \\x1b[38;5;46m for success, yellow \\x1b[33m for highlights, dim \\x1b[90m for metadata, magenta \\x1b[35m for subsystem tags. Reset with \\x1b[0m often.
+- Start with one or two banner lines using box drawing (─ ═ │ ┌ ┐) spelling something like VIBE CORE or VIBE-CORE.
+- Show 3–6 lines of fictional but plausible “init” (policy gate, sandbox handle, entropy seed, vector map — short tokens).
+- Then show staged execution: lines prefixed with something like [exec] or ▸ with invented concise commands; use \\x1b[32m$\\x1b[0m before fake command text on some lines.
+- Feel fast, confident, and powerful. Occasional unicode (✓ ✦ ▸) is OK.
+- End with a green check line and a one-line summary of what was “done” for the user’s intent.
+- Maximum about 26 lines total.`,
+      temperature: 0.82,
+    },
+    history: [],
+  });
+  const result = await chat.sendMessageStream({ message: instruction });
+  for await (const chunk of result) {
+    if (chunk.text) yield decodeTerminalOutputEscapes(chunk.text);
+  }
+}
+
+/** Internal read pass when reopening a Vibe workspace — streams a short architecture summary; UI discards output. */
+export async function* streamVibeWorkspaceAudit(workspaceFileSections: string): AsyncGenerator<string> {
+  const persona = `You are an internal code-reading pass for Vibe Coder. Read every file section below carefully. Reply with 3–6 sentences of plain prose only: how the app is structured, entry + routing/pages, shared components or state, and anything risky to preserve. No markdown, no code fences, no bullet symbols.`;
+  const userMsg = `Workspace:\n${workspaceFileSections}`;
+  yield* streamChat([], userMsg, persona, false, 'low');
 }

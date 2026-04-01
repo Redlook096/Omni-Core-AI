@@ -1,7 +1,7 @@
 import React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
-import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Globe, Terminal, FileCode, BrainCog, FolderCode, Rocket } from "lucide-react";
+import { ArrowUp, Paperclip, Square, X, StopCircle, Mic, Terminal, Search, Brain, Paintbrush, Wand2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import TextareaAutosize, { TextareaAutosizeProps } from "react-textarea-autosize";
 import { cn } from "../../lib/utils";
@@ -373,6 +373,8 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    onKeyDown?.(e);
+    if (e.defaultPrevented) return;
     const sendWithEnter = localStorage.getItem('sendWithEnter') !== 'false';
     if (e.key === "Enter" && !e.shiftKey && sendWithEnter) {
       e.preventDefault();
@@ -381,7 +383,6 @@ const PromptInputTextarea: React.FC<PromptInputTextareaProps & React.ComponentPr
       e.preventDefault();
       onSubmit?.();
     }
-    onKeyDown?.(e);
   };
 
   return (
@@ -413,6 +414,7 @@ interface PromptInputActionProps extends React.ComponentProps<typeof Tooltip> {
   tooltip: React.ReactNode;
   children: React.ReactNode;
   side?: "top" | "bottom" | "left" | "right";
+  className?: string;
 }
 const PromptInputAction: React.FC<PromptInputActionProps> = ({
   tooltip,
@@ -434,16 +436,28 @@ const PromptInputAction: React.FC<PromptInputActionProps> = ({
   );
 };
 
-// Custom Divider Component
-const CustomDivider: React.FC = () => (
-  <div className="relative h-6 w-[1.5px] mx-1">
-    <div
-      className="absolute inset-0 bg-gradient-to-t from-transparent via-[var(--border-color)] to-transparent rounded-full"
-    />
-  </div>
-);
+type SlashPaletteItem = {
+  id: string;
+  label: string;
+  command: string;
+  icon: React.ComponentType<{ className?: string }>;
+  kind: 'search' | 'think' | 'canvas' | 'vibe';
+};
+
+const SLASH_PALETTE_ITEMS: SlashPaletteItem[] = [
+  { id: 'search', label: 'Search', command: '/search', icon: Search, kind: 'search' },
+  { id: 'think', label: 'Think', command: '/think', icon: Brain, kind: 'think' },
+  { id: 'canvas', label: 'Canvas', command: '/canvas', icon: Paintbrush, kind: 'canvas' },
+  { id: 'vibe', label: 'Vibe Coder', command: '/vibe coder', icon: Wand2, kind: 'vibe' },
+];
+
+function stripSlashToken(value: string): string {
+  return value.replace(/(?:^|\s)\/[^\n]*$/, '').replace(/\s+$/, '');
+}
 
 // Main PromptInputBox Component
+
+export type PreviewElementRefChip = { id: string; kind: string; path: string };
 
 interface PromptInputBoxProps {
   onSend?: (message: string, files?: File[]) => void;
@@ -452,12 +466,31 @@ interface PromptInputBoxProps {
   className?: string;
   value?: string;
   onChange?: (value: string) => void;
+  language?: string;
   hideOptions?: boolean;
   customActions?: React.ReactNode;
   mode?: 'chat' | 'coder';
+  /** Preview pick pills (Vibe Coder) — shown above the textarea; merged into the outgoing message. */
+  previewElementRefs?: PreviewElementRefChip[];
+  onPreviewElementRefsChange?: React.Dispatch<React.SetStateAction<PreviewElementRefChip[]>>;
+  /** When user picks “Vibe Coder” from the / command palette (chat mode). */
+  onSlashVibeCoder?: (promptBeforeSlash: string) => void;
 }
 export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref: React.Ref<HTMLDivElement>) => {
-  const { onSend = () => {}, isLoading = false, placeholder = "Type your message here...", className, value, onChange, hideOptions = false, customActions, mode = 'chat' } = props;
+  const {
+    onSend = () => {},
+    isLoading = false,
+    placeholder = "Type your message here...",
+    className,
+    value,
+    onChange,
+    hideOptions = false,
+    customActions,
+    mode = 'chat',
+    previewElementRefs = [],
+    onPreviewElementRefsChange,
+    onSlashVibeCoder,
+  } = props;
   const [internalInput, setInternalInput] = React.useState("");
   const input = value !== undefined ? value : internalInput;
   const setInput = (newVal: string) => {
@@ -469,46 +502,21 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
   const [selectedImage, setSelectedImage] = React.useState<string | null>(null);
   const [isRecording, setIsRecording] = React.useState(false);
   
-  const [showDeploy, setShowDeploy] = React.useState(false);
-  const [showFormat, setShowFormat] = React.useState(false);
   const [showTerminal, setShowTerminal] = React.useState(false);
 
-  const [showSearch, setShowSearch] = React.useState(false);
-  const [showThink, setShowThink] = React.useState(false);
-  const [showCanvas, setShowCanvas] = React.useState(false);
+  /** Chat-only: set via / command palette (Search / Think / Canvas / Vibe Coder). */
+  const [selectedChatCommand, setSelectedChatCommand] = React.useState<
+    'search' | 'think' | 'canvas' | 'vibe' | null
+  >(null);
+  const [slashHighlight, setSlashHighlight] = React.useState(0);
 
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
   const promptBoxRef = React.useRef<HTMLDivElement>(null);
 
   const handleToggleChange = (value: string) => {
-    if (mode === 'coder') {
-      if (value === "deploy") {
-        setShowDeploy((prev) => !prev);
-        setShowFormat(false);
-        setShowTerminal(false);
-      } else if (value === "format") {
-        setShowFormat((prev) => !prev);
-        setShowDeploy(false);
-        setShowTerminal(false);
-      } else if (value === "terminal") {
-        setShowTerminal((prev) => !prev);
-        setShowDeploy(false);
-        setShowFormat(false);
-      }
-    } else {
-      if (value === "search") {
-        setShowSearch((prev) => !prev);
-        setShowThink(false);
-        setShowCanvas(false);
-      } else if (value === "think") {
-        setShowThink((prev) => !prev);
-        setShowSearch(false);
-        setShowCanvas(false);
-      } else if (value === "canvas") {
-        setShowCanvas((prev) => !prev);
-        setShowSearch(false);
-        setShowThink(false);
-      }
+    if (mode !== 'coder') return;
+    if (value === "terminal") {
+      setShowTerminal((prev) => !prev);
     }
   };
 
@@ -575,26 +583,47 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
     return () => document.removeEventListener("paste", handlePaste);
   }, [handlePaste]);
 
+  const buildPreviewRefBlock = () => {
+    if (!previewElementRefs.length) return '';
+    return previewElementRefs
+      .map((r) => `[Preview element: ${r.kind}]${r.path ? ` ${r.path}` : ''}`)
+      .join('\n');
+  };
+
   const handleSubmit = async () => {
-    if (input.trim() || files.length > 0) {
-      let messagePrefix = "";
-      
-      if (mode === 'coder') {
-        if (showDeploy) messagePrefix = "[Deploy: ";
-        else if (showFormat) messagePrefix = "[Format: ";
-        else if (showTerminal) messagePrefix = "[Terminal: ";
-      } else {
-        if (showSearch) messagePrefix = "[Search: ";
-        else if (showThink) messagePrefix = "[Think: ";
-        else if (showCanvas) messagePrefix = "[Canvas: ";
-      }
-      
-      const formattedInput = messagePrefix ? `${messagePrefix}${input}]` : input;
-      
-      onSend(formattedInput, files);
-      setInput("");
+    const refBlock = buildPreviewRefBlock();
+    const hasRefs = refBlock.length > 0;
+
+    if (mode === 'chat' && selectedChatCommand === 'vibe') {
+      const t = input.trim();
+      if (!t) return;
+      onSlashVibeCoder?.(t);
+      setInput('');
+      setSelectedChatCommand(null);
       setFiles([]);
       setFilePreviews({});
+      return;
+    }
+
+    if (input.trim() || files.length > 0 || hasRefs) {
+      let messagePrefix = "";
+
+      if (mode === 'coder') {
+        if (showTerminal) messagePrefix = "[Terminal: ";
+      } else {
+        if (selectedChatCommand === 'search') messagePrefix = "[Search: ";
+        else if (selectedChatCommand === 'think') messagePrefix = "[Think: ";
+        else if (selectedChatCommand === 'canvas') messagePrefix = "[Canvas: ";
+      }
+
+      const base = messagePrefix ? `${messagePrefix}${input}]` : input;
+      const formattedInput = hasRefs ? (base.trim() ? `${refBlock}\n\n${base}` : refBlock) : base;
+
+      onSend(formattedInput, files);
+      setInput('');
+      setFiles([]);
+      setFilePreviews({});
+      if (mode === 'chat') setSelectedChatCommand(null);
     }
   };
 
@@ -606,7 +635,89 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
     onSend(`[Voice message - ${duration} seconds]`, []);
   };
 
-  const hasContent = input.trim() !== "" || files.length > 0;
+  const hasContent =
+    input.trim() !== "" || files.length > 0 || previewElementRefs.length > 0;
+
+  const slashMatch = React.useMemo(() => {
+    if (mode !== 'chat' || hideOptions) return null;
+    const m = input.match(/(?:^|\s)\/([^\n]*)$/);
+    if (!m) return null;
+    return { query: m[1].trim().toLowerCase() };
+  }, [input, mode, hideOptions]);
+
+  const slashItemsFiltered = React.useMemo(() => {
+    if (!slashMatch) return [];
+    const q = slashMatch.query;
+    return SLASH_PALETTE_ITEMS.filter((it) => {
+      if (!q) return true;
+      const label = it.label.toLowerCase();
+      const cmd = it.command.replace(/^\//, '').toLowerCase();
+      return label.includes(q) || cmd.includes(q) || it.id.startsWith(q);
+    });
+  }, [slashMatch]);
+
+  const showSlashPalette = Boolean(slashMatch && slashItemsFiltered.length > 0);
+
+  React.useEffect(() => {
+    setSlashHighlight(0);
+  }, [slashMatch?.query]);
+
+  React.useEffect(() => {
+    setSlashHighlight((h) =>
+      slashItemsFiltered.length === 0 ? 0 : Math.min(h, slashItemsFiltered.length - 1),
+    );
+  }, [slashItemsFiltered.length]);
+
+  const applySlashItem = React.useCallback(
+    (item: SlashPaletteItem) => {
+      const base = stripSlashToken(input);
+      setSelectedChatCommand(item.kind);
+      setInput(base);
+      setTimeout(() => {
+        const el = document.getElementById('prompt-textarea') as HTMLTextAreaElement | null;
+        if (!el) return;
+        // Prevent scroll jumps caused by focusing an element inside the scrollable chat container.
+        try {
+          (el as unknown as { focus: (opts?: { preventScroll?: boolean }) => void }).focus({
+            preventScroll: true,
+          });
+        } catch {
+          el.focus();
+        }
+      }, 0);
+    },
+    [input, setInput],
+  );
+
+  const handleSlashKeyDown = React.useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (!showSlashPalette || slashItemsFiltered.length === 0) return;
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSlashHighlight((i) => (i + 1) % slashItemsFiltered.length);
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSlashHighlight((i) =>
+          (i - 1 + slashItemsFiltered.length) % slashItemsFiltered.length,
+        );
+      } else if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        const item = slashItemsFiltered[slashHighlight];
+        if (item) applySlashItem(item);
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setInput(stripSlashToken(input));
+      }
+    },
+    [
+      showSlashPalette,
+      slashItemsFiltered,
+      slashHighlight,
+      applySlashItem,
+      input,
+      setInput,
+    ],
+  );
 
   return (
     <>
@@ -616,7 +727,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
         isLoading={isLoading}
         onSubmit={handleSubmit}
         className={cn(
-          "w-full transition-colors duration-300 ease-in-out",
+          "w-full transition-colors duration-300 ease-in-out relative overflow-visible",
           isRecording && "border-red-500/70",
           className
         )}
@@ -626,6 +737,76 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
       >
+        <AnimatePresence>
+          {showSlashPalette && (
+            <motion.div
+              initial={{ opacity: 0, y: 20, scale: 0.94, filter: 'blur(6px)' }}
+              animate={{ opacity: 1, y: 0, scale: 1, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: 14, scale: 0.97, filter: 'blur(4px)' }}
+              transition={{ type: 'spring', stiffness: 520, damping: 32, mass: 0.55 }}
+              className="absolute bottom-full left-0 right-0 z-[60] mb-3 px-0.5 pointer-events-auto"
+            >
+              <div className="rounded-[12px] border border-[var(--border-color)] bg-[var(--vibe-bg-surface)] shadow-[0_16px_48px_var(--shadow-color)] overflow-hidden py-1 ring-1 ring-[var(--border-color)]">
+                {slashItemsFiltered.map((item, idx) => {
+                  const Icon = item.icon;
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onMouseDown={(ev) => ev.preventDefault()}
+                      onClick={() => applySlashItem(item)}
+                      className={cn(
+                        'w-full flex items-center gap-3 px-3 py-2.5 text-left transition-colors duration-150',
+                        idx === slashHighlight ? 'bg-[var(--bg-hover)]' : 'hover:bg-[var(--bg-hover)]',
+                      )}
+                    >
+                      <Icon className="w-4 h-4 shrink-0 text-[var(--text-secondary)]" />
+                      <span className="font-semibold text-[var(--text-primary)] text-sm tracking-tight">
+                        {item.label}
+                      </span>
+                      <span className="text-[11px] text-[var(--text-muted)] ml-auto font-mono opacity-90">
+                        {item.command}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+        {previewElementRefs.length > 0 && !isRecording && (
+          <div className="flex flex-wrap gap-2 px-0 pb-1.5 pt-0.5">
+            {previewElementRefs.map((ref) => (
+              <div
+                key={ref.id}
+                className="group inline-flex items-center gap-1 rounded-full border border-[var(--border-color)] bg-[var(--bg-hover)] px-3 py-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)]"
+                title={ref.path || ref.kind}
+              >
+                <span
+                  className="max-w-[140px] truncate text-[11px] font-semibold capitalize tracking-[0.02em] text-white"
+                  style={{
+                    textShadow:
+                      '0.4px 0 0 rgba(56, 189, 248, 0.45), -0.4px 0 0 rgba(248, 113, 113, 0.42)',
+                  }}
+                >
+                  {ref.kind}
+                </span>
+                <button
+                  type="button"
+                  className="rounded-full p-0.5 text-[var(--text-muted)] opacity-80 transition hover:bg-[var(--bg-hover)] hover:text-[var(--text-primary)] hover:opacity-100"
+                  aria-label="Remove reference"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onPreviewElementRefsChange?.((prev) => prev.filter((p) => p.id !== ref.id));
+                  }}
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
         {files.length > 0 && !isRecording && (
           <div className="flex flex-wrap gap-2 p-0 pb-1 transition-all duration-300">
             {files.map((file, index) => (
@@ -665,22 +846,21 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
           <PromptInputTextarea
             placeholder={
               mode === 'coder'
-                ? showDeploy
-                  ? "Deploy to production..."
-                  : showFormat
-                  ? "Format code..."
-                  : showTerminal
+                ? showTerminal
                   ? "Run terminal command..."
                   : placeholder
-                : showSearch
-                ? "Search the web..."
-                : showThink
-                ? "Thinking about..."
-                : showCanvas
-                ? "Working on canvas..."
-                : placeholder
+                : selectedChatCommand === 'search'
+                  ? "Search the web…"
+                  : selectedChatCommand === 'think'
+                    ? "Think through…"
+                    : selectedChatCommand === 'canvas'
+                      ? "Canvas prompt…"
+                      : selectedChatCommand === 'vibe'
+                        ? "What should Vibe Coder build…"
+                        : placeholder
             }
             className="text-base"
+            onKeyDown={handleSlashKeyDown}
           />
         </div>
 
@@ -699,7 +879,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
               isRecording ? "opacity-0 invisible h-0" : "opacity-100 visible"
             )}
           >
-            <>
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               <PromptInputAction tooltip="Upload image">
                   <button
                     onClick={() => uploadInputRef.current?.click()}
@@ -720,121 +900,74 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                   </button>
                 </PromptInputAction>
 
-                {!hideOptions && (
+                {mode === 'chat' && selectedChatCommand && (
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={selectedChatCommand}
+                      initial={{ opacity: 0, x: -6, scale: 0.96 }}
+                      animate={{ opacity: 1, x: 0, scale: 1 }}
+                      exit={{ opacity: 0, x: -4, scale: 0.98 }}
+                      transition={{ type: 'spring', stiffness: 420, damping: 28 }}
+                      className="flex items-center"
+                    >
+                      {(() => {
+                        const meta = SLASH_PALETTE_ITEMS.find((it) => it.kind === selectedChatCommand);
+                        if (!meta) return null;
+                        const Icon = meta.icon;
+                        return (
+                          <div
+                            className="flex items-center gap-1.5 rounded-full border border-sky-500/25 bg-sky-500/[0.07] pl-2 pr-1 py-1 text-[11px] font-medium text-sky-100/95 shadow-[0_0_20px_rgba(56,189,248,0.12)]"
+                            title={`${meta.label} — ${meta.command}`}
+                          >
+                            <Icon className="h-3.5 w-3.5 shrink-0 text-sky-300/90" />
+                            <span className="max-w-[120px] truncate sm:max-w-[180px]">{meta.label}</span>
+                            <span className="font-mono text-[10px] text-sky-400/80">{meta.command}</span>
+                            <button
+                              type="button"
+                              className="rounded-full p-0.5 text-sky-300/70 hover:bg-white/10 hover:text-white"
+                              aria-label="Clear mode"
+                              onClick={() => setSelectedChatCommand(null)}
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
+                  </AnimatePresence>
+                )}
+
+                {!hideOptions && mode === 'coder' && (
                   <div className="flex items-center">
                     <button
                       type="button"
-                      onClick={() => handleToggleChange(mode === 'coder' ? "deploy" : "search")}
+                      onClick={() => handleToggleChange('terminal')}
                       className={cn(
-                        "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                        (mode === 'coder' ? showDeploy : showSearch)
-                          ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
-                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
+                        'rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8',
+                        showTerminal
+                          ? 'bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]'
+                          : 'bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]',
                       )}
                     >
                       <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
                         <motion.div
-                          animate={{ rotate: (mode === 'coder' ? showDeploy : showSearch) ? 360 : 0, scale: (mode === 'coder' ? showDeploy : showSearch) ? 1.1 : 1 }}
-                          whileHover={{ rotate: (mode === 'coder' ? showDeploy : showSearch) ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
-                          transition={{ type: "spring", stiffness: 260, damping: 25 }}
+                          animate={{ rotate: showTerminal ? 360 : 0, scale: showTerminal ? 1.1 : 1 }}
+                          whileHover={{ rotate: showTerminal ? 360 : 15, scale: 1.1, transition: { type: 'spring', stiffness: 300, damping: 10 } }}
+                          transition={{ type: 'spring', stiffness: 260, damping: 25 }}
                         >
-                          {mode === 'coder' ? (
-                            <Rocket className={cn("w-4 h-4", showDeploy ? "text-[var(--text-primary)]" : "text-inherit")} />
-                          ) : (
-                            <Globe className={cn("w-4 h-4", showSearch ? "text-[var(--text-primary)]" : "text-inherit")} />
-                          )}
+                          <Terminal className={cn('w-4 h-4', showTerminal ? 'text-[var(--text-primary)]' : 'text-inherit')} />
                         </motion.div>
                       </div>
                       <AnimatePresence>
-                        {(mode === 'coder' ? showDeploy : showSearch) && (
+                        {showTerminal && (
                           <motion.span
                             initial={{ width: 0, opacity: 0 }}
-                            animate={{ width: "auto", opacity: 1 }}
+                            animate={{ width: 'auto', opacity: 1 }}
                             exit={{ width: 0, opacity: 0 }}
                             transition={{ duration: 0.2 }}
                             className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
                           >
-                            {mode === 'coder' ? "Deploy" : "Search"}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </button>
-
-                    <CustomDivider />
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleChange(mode === 'coder' ? "format" : "think")}
-                      className={cn(
-                        "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                        (mode === 'coder' ? showFormat : showThink)
-                          ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
-                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                      )}
-                    >
-                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                        <motion.div
-                          animate={{ rotate: (mode === 'coder' ? showFormat : showThink) ? 360 : 0, scale: (mode === 'coder' ? showFormat : showThink) ? 1.1 : 1 }}
-                          whileHover={{ rotate: (mode === 'coder' ? showFormat : showThink) ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
-                          transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                        >
-                          {mode === 'coder' ? (
-                            <FileCode className={cn("w-4 h-4", showFormat ? "text-[var(--text-primary)]" : "text-inherit")} />
-                          ) : (
-                            <BrainCog className={cn("w-4 h-4", showThink ? "text-[var(--text-primary)]" : "text-inherit")} />
-                          )}
-                        </motion.div>
-                      </div>
-                      <AnimatePresence>
-                        {(mode === 'coder' ? showFormat : showThink) && (
-                          <motion.span
-                            initial={{ width: 0, opacity: 0 }}
-                            animate={{ width: "auto", opacity: 1 }}
-                            exit={{ width: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
-                          >
-                            {mode === 'coder' ? "Format" : "Think"}
-                          </motion.span>
-                        )}
-                      </AnimatePresence>
-                    </button>
-
-                    <CustomDivider />
-
-                    <button
-                      type="button"
-                      onClick={() => handleToggleChange(mode === 'coder' ? "terminal" : "canvas")}
-                      className={cn(
-                        "rounded-full transition-all flex items-center gap-1 px-2 py-1 border h-8",
-                        (mode === 'coder' ? showTerminal : showCanvas)
-                          ? "bg-black/10 dark:bg-white/10 border-black/20 dark:border-white/20 text-[var(--text-primary)]"
-                          : "bg-transparent border-transparent text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-                      )}
-                    >
-                      <div className="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                        <motion.div
-                          animate={{ rotate: (mode === 'coder' ? showTerminal : showCanvas) ? 360 : 0, scale: (mode === 'coder' ? showTerminal : showCanvas) ? 1.1 : 1 }}
-                          whileHover={{ rotate: (mode === 'coder' ? showTerminal : showCanvas) ? 360 : 15, scale: 1.1, transition: { type: "spring", stiffness: 300, damping: 10 } }}
-                          transition={{ type: "spring", stiffness: 260, damping: 25 }}
-                        >
-                          {mode === 'coder' ? (
-                            <Terminal className={cn("w-4 h-4", showTerminal ? "text-[var(--text-primary)]" : "text-inherit")} />
-                          ) : (
-                            <FolderCode className={cn("w-4 h-4", showCanvas ? "text-[var(--text-primary)]" : "text-inherit")} />
-                          )}
-                        </motion.div>
-                      </div>
-                      <AnimatePresence>
-                        {(mode === 'coder' ? showTerminal : showCanvas) && (
-                          <motion.span
-                            initial={{ width: 0, opacity: 0 }}
-                            animate={{ width: "auto", opacity: 1 }}
-                            exit={{ width: 0, opacity: 0 }}
-                            transition={{ duration: 0.2 }}
-                            className="text-xs overflow-hidden whitespace-nowrap text-[var(--text-primary)] flex-shrink-0"
-                          >
-                            {mode === 'coder' ? "Terminal" : "Canvas"}
+                            Terminal
                           </motion.span>
                         )}
                       </AnimatePresence>
@@ -842,7 +975,7 @@ export const PromptInputBox = React.forwardRef((props: PromptInputBoxProps, ref:
                   </div>
                 )}
                 {customActions}
-            </>
+            </div>
           </div>
 
           <PromptInputAction

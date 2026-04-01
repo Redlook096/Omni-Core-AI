@@ -7,17 +7,20 @@ import { ChatMessage } from './components/ui/chat-message';
 import { streamChat, generateTitle, detectCodeIntent } from './lib/gemini';
 import { t } from './lib/translations';
 import { AnimatePresence, motion } from 'framer-motion';
-import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, FileText, Lightbulb, MessageSquare, Download, Code, Zap, BarChart, Bug, Languages, Terminal } from 'lucide-react';
+import { SquarePen, Plus, Search, X, Check, Pencil, Trash2, Settings, MessageSquare, Download, Terminal } from 'lucide-react';
 import { ThemeToggle } from './components/ui/theme-toggle';
 import { FakeTextStory } from './components/ui/fake-text-story';
 import { CreatorsMenu } from './components/ui/creators-menu';
 import { TextShimmer } from './components/ui/text-shimmer';
 import { ChatManagerModal } from './components/ui/chat-manager-modal';
 import { SettingsModal } from './components/ui/settings-modal';
-import { CodeRunner } from './components/ui/code-runner';
+import { CodeRunner, type CanvasExecutionMode } from './components/ui/code-runner';
+import { extractFirstCodeBlock, getCanvasExecutionMode } from './lib/canvas-preview';
 import { VibeCoder } from './components/ui/vibe-coder';
+import { VibeCoderErrorBoundary } from './components/ui/vibe-coder-error-boundary';
 import { SiriOrb } from './components/SiriOrb';
 import { cn } from './lib/utils';
+import { buildWebsiteIntentAddendum, buildWebsiteThemeResearchAddendum } from './lib/theme-research';
 
 interface Message {
   role: 'user' | 'model';
@@ -68,23 +71,6 @@ const itemVariants = {
     transition: { duration: 0.2 } 
   }
 };
-
-interface Suggestion {
-  iconName: 'FileText' | 'Lightbulb' | 'MessageSquare' | 'Code' | 'Zap' | 'BarChart' | 'Bug' | 'Languages' | 'SquarePen' | 'Settings' | 'Terminal';
-  text: string;
-  subtext: string;
-  prompt?: string;
-  autoSend?: boolean;
-  action?: 'open-runner' | 'open-settings' | 'open-story' | 'toggle-theme' | 'open-chat-manager' | 'open-vibe-coder';
-}
-
-const SUGGESTIONS_POOL: Suggestion[] = [
-  { iconName: 'SquarePen', text: 'Code Playground', subtext: 'Write & run code instantly', action: 'open-runner' },
-  { iconName: 'Settings', text: 'App Preferences', subtext: 'Customize your experience', action: 'open-settings' },
-  { iconName: 'Terminal', text: 'Vibe Coder', subtext: 'Enter IDE mode', action: 'open-vibe-coder' },
-  { iconName: 'Zap', text: 'Toggle Theme', subtext: 'Switch light/dark mode', action: 'toggle-theme' },
-  { iconName: 'FileText', text: 'Chat History', subtext: 'Manage past conversations', action: 'open-chat-manager' }
-];
 
 const AnimatedMenuIcon = ({ isOpen }: { isOpen: boolean }) => (
   <div className="relative w-5 h-5 flex justify-center items-center">
@@ -141,10 +127,19 @@ export default function App() {
   const [sendWithEnter, setSendWithEnter] = useState(() => {
     return localStorage.getItem('sendWithEnter') !== 'false';
   });
-  const [currentSuggestions, setCurrentSuggestions] = useState<Suggestion[]>([]);
   const [inputValue, setInputValue] = useState('');
-  const [runnerState, setRunnerState] = useState<{isOpen: boolean, code: string, language: string, isFixingErrors?: boolean}>({ isOpen: false, code: '', language: '', isFixingErrors: false });
-  const handleSubmitRef = useRef<(value: string) => void>();
+  const [vibeHandoff, setVibeHandoff] = useState<{
+    prompt: string;
+    autoSubmit: boolean;
+  } | null>(null);
+  const [runnerState, setRunnerState] = useState<{
+    isOpen: boolean;
+    code: string;
+    language: string;
+    isFixingErrors?: boolean;
+    executionMode?: CanvasExecutionMode;
+  }>({ isOpen: false, code: '', language: '', isFixingErrors: false });
+  const handleSubmitRef = useRef<((value: string) => void) | null>(null);
   
   const [history, setHistory] = useState<ChatSession[]>(() => {
     const saved = localStorage.getItem('chatHistory');
@@ -176,15 +171,22 @@ export default function App() {
   const editInputRef = useRef<HTMLInputElement>(null);
   const mainContentRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUp = useRef(false);
+  const isLoadingRef = useRef(false);
+  const lastAutoFixRef = useRef<{ t: number; sig: string }>({ t: 0, sig: '' });
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
 
   // Listen for custom run-code and set-prompt events
   useEffect(() => {
     const handleRunCode = (e: Event) => {
       const customEvent = e as CustomEvent;
+      const lang = String(customEvent.detail?.language ?? 'javascript');
       setRunnerState({
         isOpen: true,
-        code: customEvent.detail.code,
-        language: customEvent.detail.language
+        code: String(customEvent.detail?.code ?? ''),
+        language: lang,
+        executionMode: getCanvasExecutionMode(lang),
       });
     };
     
@@ -199,8 +201,15 @@ export default function App() {
     };
 
     const handleAutoFixCode = (e: Event) => {
+      if (isLoadingRef.current) return;
       const customEvent = e as CustomEvent;
       const { code, language, error } = customEvent.detail;
+      const errStr = String(error ?? '');
+      const sig = `${String(language)}:${errStr.slice(0, 400)}`;
+      const now = Date.now();
+      if (now - lastAutoFixRef.current.t < 2000 && lastAutoFixRef.current.sig === sig) return;
+      lastAutoFixRef.current = { t: now, sig };
+
       const prompt = `[Error: The ${language} code failed to execute.]\n\n\`\`\`${language}\n${code}\n\`\`\`\n\nError details:\n\`\`\`\n${error}\n\`\`\`\n\nPlease fix the code and provide the fully functional version. Ensure it is 100% functional and fixes the error.`;
       
       // Keep the code runner open and show fixing state
@@ -237,10 +246,6 @@ export default function App() {
   useEffect(() => {
     if (!hasStarted) {
       setInputValue(''); // Clear input on new chat
-      
-      // Use static functional suggestions
-      const shuffled = [...SUGGESTIONS_POOL].sort(() => 0.5 - Math.random());
-      setCurrentSuggestions(shuffled.slice(0, 3));
     }
   }, [hasStarted, history]);
 
@@ -382,7 +387,17 @@ export default function App() {
 
   const handleSubmit = async (value: string) => {
     if (!value.trim()) return;
-    
+
+    const trimmed = value.trim();
+    const vibeSuffix = /\s*\/vibe\s+coder\s*$/i;
+    if (vibeSuffix.test(trimmed)) {
+      const base = trimmed.replace(vibeSuffix, '').trim();
+      setVibeHandoff({ prompt: base, autoSubmit: base.length > 0 });
+      setInputValue('');
+      setCurrentView('vibe-coder');
+      return;
+    }
+
     setInputValue('');
 
     let sessionId = currentSessionId;
@@ -429,7 +444,10 @@ export default function App() {
 
     try {
       let processedValue = value;
-      if (!/^\[(Search|Think|Canvas|Reasoning|Project|Deploy|Format|Terminal):\s*/.test(processedValue)) {
+      if (
+        !/^\[(Search|Think|Canvas|Reasoning|Project|Deploy|Format|Terminal):\s*/.test(processedValue) &&
+        !processedValue.startsWith('[Error:')
+      ) {
         const isCodeIntent = await detectCodeIntent(processedValue);
         if (isCodeIntent) {
           processedValue = `[Canvas: ${processedValue}]`;
@@ -448,7 +466,13 @@ export default function App() {
       setMessages(prev => [...prev, { role: 'model', content: '' }]);
       
       let fullResponse = '';
-      const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const themeResearch =
+        buildWebsiteThemeResearchAddendum(processedValue) ??
+        buildWebsiteThemeResearchAddendum(value) ??
+        null;
+      const websiteIntent = buildWebsiteIntentAddendum(processedValue) ?? buildWebsiteIntentAddendum(value) ?? null;
+      const addendum = [themeResearch, websiteIntent].filter(Boolean).join('\n\n');
+      const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.${addendum ? `\n\n${addendum}` : ''}`;
       const stream = streamChat(newMessages, processedValue, customPersona, false, creativityLevel);
       
       if (streamResponses) {
@@ -471,13 +495,31 @@ export default function App() {
         });
       }
 
-      setRunnerState(prev => {
+      setRunnerState((prev) => {
         if (prev.isOpen && prev.isFixingErrors) {
-          const match = fullResponse.match(/```(\w+)?\n([\s\S]*?)(?:```|$)/);
-          if (match) {
-            return { ...prev, code: match[2], language: match[1] || prev.language, isFixingErrors: false };
+          const block = extractFirstCodeBlock(fullResponse);
+          if (block) {
+            return {
+              ...prev,
+              code: block.code,
+              language: block.lang,
+              executionMode: getCanvasExecutionMode(block.lang),
+              isFixingErrors: false,
+            };
           }
           return { ...prev, isFixingErrors: false };
+        }
+        if (processedValue.startsWith('[Canvas:')) {
+          const block = extractFirstCodeBlock(fullResponse);
+          if (block) {
+            return {
+              ...prev,
+              isOpen: true,
+              code: block.code,
+              language: block.lang,
+              executionMode: getCanvasExecutionMode(block.lang),
+            };
+          }
         }
         return prev;
       });
@@ -507,7 +549,13 @@ export default function App() {
     let accumulatedResponse = '';
     
     try {
-      const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.`;
+      const themeResearch =
+        buildWebsiteThemeResearchAddendum(previousUserMessage.content) ?? null;
+      const websiteIntent =
+        buildWebsiteIntentAddendum(previousUserMessage.content) ?? null;
+      const addendum = [themeResearch, websiteIntent].filter(Boolean).join('\n\n');
+
+      const customPersona = `${aiMemory ? `Here are some custom instructions/memory to keep in mind: ${aiMemory}. ` : ''}You must respond in ${language}. Your personality/mood is ${aiMood}. Keep your responses ${responseLength} in length. Your creativity level should be ${creativityLevel}.${addendum ? `\n\n${addendum}` : ''}`;
       const stream = streamChat(historyUpToNow, previousUserMessage.content, customPersona, true, creativityLevel);
       
       for await (const chunk of stream) {
@@ -533,13 +581,31 @@ export default function App() {
         return updated;
       });
 
-      setRunnerState(prev => {
+      setRunnerState((prev) => {
         if (prev.isOpen && prev.isFixingErrors) {
-          const match = accumulatedResponse.match(/```(\w+)?\n([\s\S]*?)(?:```|$)/);
-          if (match) {
-            return { ...prev, code: match[2], language: match[1] || prev.language, isFixingErrors: false };
+          const block = extractFirstCodeBlock(accumulatedResponse);
+          if (block) {
+            return {
+              ...prev,
+              code: block.code,
+              language: block.lang,
+              executionMode: getCanvasExecutionMode(block.lang),
+              isFixingErrors: false,
+            };
           }
           return { ...prev, isFixingErrors: false };
+        }
+        if (previousUserMessage.content.startsWith('[Canvas:')) {
+          const block = extractFirstCodeBlock(accumulatedResponse);
+          if (block) {
+            return {
+              ...prev,
+              isOpen: true,
+              code: block.code,
+              language: block.lang,
+              executionMode: getCanvasExecutionMode(block.lang),
+            };
+          }
         }
         return prev;
       });
@@ -877,58 +943,16 @@ export default function App() {
                         value={inputValue}
                         onChange={setInputValue}
                         language={language}
+                        onSlashVibeCoder={(promptBefore) => {
+                          setVibeHandoff({
+                            prompt: promptBefore,
+                            autoSubmit: promptBefore.length > 0,
+                          });
+                          setInputValue('');
+                          setCurrentView('vibe-coder');
+                        }}
                       />
                     </motion.div>
-                    
-                    {/* Quick Action Suggestions */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 w-full mt-4">
-                      {currentSuggestions.map((suggestion, i) => {
-                        const IconComponent = {
-                          FileText, Lightbulb, MessageSquare, Code, Zap, BarChart, Bug, Languages, SquarePen, Settings, Terminal
-                        }[suggestion.iconName];
-                        
-                        return (
-                          <motion.button
-                            key={i}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 + i * 0.05, duration: 0.4, ease: "easeOut" }}
-                            onClick={() => {
-                              if (suggestion.action) {
-                                if (suggestion.action === 'open-runner') setRunnerState({ isOpen: true, code: '', language: 'javascript' });
-                                else if (suggestion.action === 'open-settings') setIsSettingsOpen(true);
-                                else if (suggestion.action === 'open-story') setCurrentView('story');
-                                else if (suggestion.action === 'toggle-theme') setIsDark(!isDark);
-                                else if (suggestion.action === 'open-chat-manager') setIsChatManagerOpen(true);
-                                else if (suggestion.action === 'open-vibe-coder') setCurrentView('vibe-coder');
-                              } else if (suggestion.prompt) {
-                                if (suggestion.autoSend) {
-                                  handleSubmit(suggestion.prompt);
-                                } else {
-                                  setInputValue(suggestion.prompt);
-                                  setTimeout(() => {
-                                    document.getElementById('prompt-textarea')?.focus();
-                                  }, 50);
-                                }
-                              }
-                            }}
-                            className="flex items-center gap-3 p-3 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] transition-all duration-200 text-left group shadow-sm hover:shadow relative overflow-hidden"
-                          >
-                            <div className="flex items-center justify-center w-8 h-8 rounded-xl bg-[var(--bg-app)] border border-[var(--border-color)] group-hover:border-[var(--text-primary)]/20 transition-colors duration-300 shrink-0">
-                              {IconComponent && <IconComponent className="w-4 h-4 text-[var(--text-secondary)] group-hover:text-[var(--text-primary)] transition-colors duration-300" />}
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[var(--text-primary)] font-medium text-sm truncate">
-                                {suggestion.text}
-                              </span>
-                              <span className="text-[10px] text-[var(--text-muted)] truncate">
-                                {suggestion.subtext}
-                              </span>
-                            </div>
-                          </motion.button>
-                        );
-                      })}
-                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -942,7 +966,7 @@ export default function App() {
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
-                    className="w-full flex-1 flex flex-col gap-8"
+                    className="w-full flex-1 flex flex-col gap-8 relative"
                   >
                     {messages.map((msg, idx) => {
                       const isSearching = idx > 0 && messages[idx - 1].role === 'user' && messages[idx - 1].content.startsWith('[Search: ');
@@ -975,7 +999,21 @@ export default function App() {
           </div>
         ) : currentView === 'vibe-coder' ? (
           <div className="w-full h-full overflow-hidden">
-            <VibeCoder onBack={() => setCurrentView('chat')} />
+            <VibeCoderErrorBoundary>
+              <VibeCoder
+                key={
+                  vibeHandoff
+                    ? `${vibeHandoff.prompt}-${vibeHandoff.autoSubmit}`
+                    : 'vibe-default'
+                }
+                onBack={() => {
+                  setCurrentView('chat');
+                  setVibeHandoff(null);
+                }}
+                initialPrompt={vibeHandoff?.prompt}
+                autoSubmitOnMount={vibeHandoff?.autoSubmit ?? false}
+              />
+            </VibeCoderErrorBoundary>
           </div>
         ) : (
           <div className="w-full h-full overflow-hidden pt-14 pb-24 flex items-center justify-center">
@@ -1014,6 +1052,14 @@ export default function App() {
               value={inputValue}
               onChange={setInputValue}
               language={language}
+              onSlashVibeCoder={(promptBefore) => {
+                setVibeHandoff({
+                  prompt: promptBefore,
+                  autoSubmit: promptBefore.length > 0,
+                });
+                setInputValue('');
+                setCurrentView('vibe-coder');
+              }}
             />
           </motion.div>
         </motion.div>
@@ -1062,6 +1108,7 @@ export default function App() {
                     </DockItem>
                     <DockItem
                       onClick={() => {
+                        setVibeHandoff(null);
                         setCurrentView('vibe-coder');
                       }}
                       className='aspect-square rounded-full bg-[var(--bg-card)] border border-[var(--border-color)] shadow-sm'
@@ -1146,6 +1193,7 @@ export default function App() {
         code={runnerState.code}
         language={runnerState.language}
         isFixingErrors={runnerState.isFixingErrors}
+        executionMode={runnerState.executionMode}
       />
 
     </div>

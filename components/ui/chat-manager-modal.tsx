@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Download, Upload, CheckSquare, Square, Trash2 } from 'lucide-react';
 import { cn } from '../../lib/utils';
+import { ConfirmDialog, ToastBanner } from './native-dialog';
 
 interface Message {
   role: 'user' | 'model';
@@ -37,6 +38,8 @@ export function ChatManagerModal({
   setHasStarted
 }: ChatManagerModalProps) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const toggleSelection = (id: string) => {
@@ -93,7 +96,7 @@ export function ChatManagerModal({
         const text = event.target?.result as string;
         
         if (!text.startsWith('---OMNI-CORE-AI-EXPORT---\n')) {
-          alert("Invalid file format. Please use a file exported from this app.");
+          setToast('Invalid file format. Please use a file exported from this app.');
           return;
         }
         
@@ -109,14 +112,14 @@ export function ChatManagerModal({
           }));
           
           setHistory(prev => [...importedChats, ...prev]);
-          alert(`Successfully imported ${importedChats.length} chats.`);
+          setToast(`Imported ${importedChats.length} chat${importedChats.length === 1 ? '' : 's'} successfully.`);
           onClose();
         } else {
-          alert("Could not parse chat format.");
+          setToast('Could not parse chat format.');
         }
       } catch (error) {
         console.error("Error importing chat:", error);
-        alert("Failed to import chat.");
+        setToast('Failed to import chat.');
       }
       
       if (fileInputRef.current) {
@@ -128,23 +131,26 @@ export function ChatManagerModal({
 
   const handleDelete = () => {
     if (selectedIds.size === 0) return;
-    if (confirm(`Are you sure you want to delete ${selectedIds.size} chats?`)) {
-      setHistory(prev => prev.filter(s => !selectedIds.has(s.id)));
-      
-      // If current session is deleted, reset view
-      if (currentSessionId && selectedIds.has(currentSessionId)) {
-        setCurrentSessionId(null);
-        setMessages([]);
-        setHasStarted(false);
-      }
-      
-      setSelectedIds(new Set());
+    setBulkDeleteOpen(true);
+  };
+
+  const confirmBulkDelete = () => {
+    setBulkDeleteOpen(false);
+    setHistory((prev) => prev.filter((s) => !selectedIds.has(s.id)));
+
+    if (currentSessionId && selectedIds.has(currentSessionId)) {
+      setCurrentSessionId(null);
+      setMessages([]);
+      setHasStarted(false);
     }
+
+    setSelectedIds(new Set());
   };
 
   if (!isOpen) return null;
 
   return (
+    <>
     <AnimatePresence>
       <motion.div
         initial={{ opacity: 0 }}
@@ -258,5 +264,17 @@ export function ChatManagerModal({
         </motion.div>
       </motion.div>
     </AnimatePresence>
+
+      <ConfirmDialog
+        open={bulkDeleteOpen}
+        title="Delete chats"
+        message={`Delete ${selectedIds.size} selected chat${selectedIds.size === 1 ? '' : 's'}? This cannot be undone.`}
+        danger
+        confirmLabel="Delete"
+        onCancel={() => setBulkDeleteOpen(false)}
+        onConfirm={confirmBulkDelete}
+      />
+      <ToastBanner message={toast} onDismiss={() => setToast(null)} />
+    </>
   );
 }

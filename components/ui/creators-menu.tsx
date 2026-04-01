@@ -5,12 +5,8 @@ interface CreatorsMenuProps {
 }
 
 export function CreatorsMenu({ onSelect }: CreatorsMenuProps) {
-  // Empty as requested
-  // Using onSelect to satisfy linter if needed, though it's empty
-  React.useEffect(() => {
-    const noop = () => {};
-    noop(onSelect);
-  }, [onSelect]);
+  // Keeps the callback in scope for future interactions.
+  void onSelect;
   return (
     <div className="w-full h-full flex items-center justify-center p-6">
     </div>

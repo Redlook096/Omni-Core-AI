@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { cn } from '../../lib/utils';
+import { getCanvasExecutionMode } from '../../lib/canvas-preview';
 import { 
   Copy, 
   RotateCw, 
@@ -8,15 +9,12 @@ import {
   BrainCog,
   FolderCode,
   RefreshCw,
-  X,
-  Square,
-  CheckSquare
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { MorphingSquare } from './morphing-square';
-import { TextShimmer } from './text-shimmer';
+import { TextShimmer, VIBE_THINKING_SHIMMER_DURATION } from './text-shimmer';
 
 export interface ChatMessageProps {
   role: 'user' | 'model';
@@ -28,9 +26,19 @@ export interface ChatMessageProps {
   isCanvas?: boolean;
 }
 
+const PRISM_SAFE_LANG = /^[a-z0-9+#.-]{1,32}$/i;
+
+function safeHighlightLanguage(lang: string): string {
+  const raw = String(lang ?? 'text').trim().toLowerCase();
+  if (!raw || !PRISM_SAFE_LANG.test(raw)) return 'text';
+  return raw;
+}
+
 const CodeBlock = ({ code, language, isStreaming }: { code: string, language: string, isStreaming?: boolean }) => {
+  const safeCode = String(code ?? '');
+  const safeLang = safeHighlightLanguage(language);
   const [isEditing, setIsEditing] = React.useState(false);
-  const [editedCode, setEditedCode] = React.useState(code);
+  const [editedCode, setEditedCode] = React.useState(safeCode);
 
   return (
     <div className="my-4 rounded-2xl bg-[#1e1e1e] border border-white/10 shadow-lg relative">
@@ -38,7 +46,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-200">Code</span>
           <span>·</span>
-          <span>{language}</span>
+          <span>{safeLang}</span>
         </div>
         <div className="flex items-center gap-3">
           {isEditing ? (
@@ -53,7 +61,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
                 onClick={() => {
                   setIsEditing(false);
                   window.dispatchEvent(new CustomEvent('ask-ai-code', { 
-                    detail: { code: editedCode, language } 
+                    detail: { code: editedCode, language: safeLang } 
                   }));
                 }}
                 className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
@@ -65,7 +73,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
             <>
               <button 
                 onClick={() => {
-                  navigator.clipboard.writeText(code);
+                  navigator.clipboard.writeText(safeCode);
                 }}
                 className="hover:text-white transition-colors flex items-center gap-1"
               >
@@ -74,7 +82,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
               <button 
                 onClick={() => {
                   setIsEditing(true);
-                  setEditedCode(code);
+                  setEditedCode(safeCode);
                 }}
                 className="hover:text-white transition-colors"
               >
@@ -82,7 +90,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
               </button>
               <button 
                 onClick={() => {
-                  const blob = new Blob([code], { type: 'text/plain' });
+                  const blob = new Blob([safeCode], { type: 'text/plain' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
@@ -95,7 +103,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
                     'html': 'html', 'css': 'css', 'json': 'json', 'xml': 'xml',
                     'sql': 'sql', 'markdown': 'md', 'md': 'md'
                   };
-                  const ext = extMap[language.toLowerCase()] || 'txt';
+                  const ext = extMap[safeLang.toLowerCase()] || 'txt';
                   a.download = `snippet.${ext}`;
                   
                   document.body.appendChild(a);
@@ -109,7 +117,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
               </button>
               <button 
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent('run-code', { detail: { code, language } }));
+                  window.dispatchEvent(new CustomEvent('run-code', { detail: { code: safeCode, language: safeLang } }));
                 }}
                 className="bg-white text-black px-3 py-1 rounded-full font-medium hover:bg-gray-200 transition-colors flex items-center gap-1"
               >
@@ -130,7 +138,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
           />
         ) : (
           <SyntaxHighlighter
-            language={language}
+            language={safeLang}
             style={vscDarkPlus}
             customStyle={{
               margin: 0,
@@ -138,7 +146,7 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
               background: 'transparent',
             }}
           >
-            {code}
+            {safeCode}
           </SyntaxHighlighter>
         )}
       </div>
@@ -147,10 +155,11 @@ const CodeBlock = ({ code, language, isStreaming }: { code: string, language: st
 };
 
 const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreaming?: boolean }) => {
-  if (!text) return null;
+  const safe = String(text ?? '');
+  if (!safe) return null;
 
   // Split by [Type: ...] blocks first
-  const blockParts = text.split(/(\[(?:Think|Search|Canvas):\s*[\s\S]*?(?:\]|$))/g);
+  const blockParts = safe.split(/(\[(?:Think|Search|Canvas):\s*[\s\S]*?(?:\]|$))/g);
 
   return (
     <div>
@@ -175,7 +184,10 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                 {type === 'Canvas' && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />}
                 {type}
               </div>
-              <TextShimmer duration={2} className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">
+              <TextShimmer
+                duration={VIBE_THINKING_SHIMMER_DURATION}
+                className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap"
+              >
                 {content || '...'}
               </TextShimmer>
             </div>
@@ -194,8 +206,15 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                 const match = codePart.match(/```(\w+)?\n([\s\S]*?)(?:```|$)/);
                 const language = match ? match[1] || 'text' : 'text';
                 const code = match ? match[2] : codePart.slice(3, isClosed ? -3 : undefined);
-                
-                return <CodeBlock key={codeIdx} code={code} language={language} isStreaming={isStreaming} />;
+
+                return (
+                  <CodeBlock
+                    key={codeIdx}
+                    code={String(code ?? '')}
+                    language={String(language)}
+                    isStreaming={isStreaming}
+                  />
+                );
               }
 
               // Split by headers ***
@@ -238,30 +257,18 @@ const FormatText = React.memo(({ text, isStreaming }: { text: string, isStreamin
                                   const isUnchecked = trimmedLine.startsWith('- [ ] ');
                                   const isChecked = trimmedLine.startsWith('- [x] ') || trimmedLine.startsWith('- [X] ');
                                   const isError = trimmedLine.startsWith('- [!] ') || trimmedLine.startsWith('- [E] ');
+                                  const isCheckboxLine = isUnchecked || isChecked || isError;
                                   const isBullet = trimmedLine.startsWith('- ') || trimmedLine.startsWith('• ');
 
                                   return (
                                     <React.Fragment key={l}>
-                                      {isUnchecked || isChecked || isError ? (
-                                        <motion.div 
-                                          initial={{ opacity: 0, x: -10 }}
-                                          animate={{ opacity: 1, x: 0 }}
-                                          className={cn(
-                                            "flex items-start gap-3 ml-2 my-2.5 p-3 rounded-xl border transition-all duration-300",
-                                            isUnchecked && "bg-[var(--bg-card)] border-[var(--border-color)] text-[var(--text-secondary)]",
-                                            isChecked && "bg-emerald-500/5 border-emerald-500/20 text-emerald-500/90",
-                                            isError && "bg-red-500/5 border-red-500/20 text-red-500/90 shadow-[0_0_15px_rgba(239,68,68,0.1)]"
-                                          )}
-                                        >
-                                          <div className="mt-0.5 shrink-0">
-                                            {isUnchecked && <Square className="w-4 h-4 opacity-40" />}
-                                            {isChecked && <CheckSquare className="w-4 h-4" />}
-                                            {isError && <X className="w-4 h-4" />}
-                                          </div>
-                                          <span className="flex-1 leading-relaxed font-medium">
+                                      {isCheckboxLine ? (
+                                        <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
+                                          <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
+                                          <span className="flex-1 leading-relaxed">
                                             {trimmedLine.substring(6)}
                                           </span>
-                                        </motion.div>
+                                        </span>
                                       ) : isBullet ? (
                                         <span className="flex items-start gap-3 ml-2 my-2 text-[var(--text-secondary)]">
                                            <span className="mt-2 w-1.5 h-1.5 rounded-full bg-[var(--text-muted)] shrink-0 opacity-80" />
@@ -308,41 +315,64 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
   const isUser = role === 'user';
   const [isCopied, setIsCopied] = useState(false);
 
-  let displayContent = content;
+  const safeContent = typeof content === 'string' ? content : String(content ?? '');
+  let displayContent = safeContent;
   if (isUser) {
-    const canvasMatch = displayContent.match(/^\[(Canvas|Search|Think|Reasoning|Project|Deploy|Format|Terminal):\s*(.*)\]$/s);
-    if (canvasMatch) {
-      displayContent = canvasMatch[2];
-    }
-    
-    const errorMatch = displayContent.match(/^\[Error:\s*(.*)\]$/s);
-    if (errorMatch) {
+    const autoFixMatch = safeContent.match(/^\[Error:\s*([^\]]+)\]\s*([\s\S]*)$/);
+    if (autoFixMatch) {
+      const headline = autoFixMatch[1].trim();
+      const rest = autoFixMatch[2].trim();
+      const langHint = headline.match(/The\s+([\w+-]+)\s+code\s+failed/i)?.[1] ?? '';
+      const isPreviewFix = getCanvasExecutionMode(langHint || 'text') === 'preview';
+
       return (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           className="flex w-full mb-8 justify-center"
         >
-          <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 max-w-[90%] md:max-w-[600px] flex items-start gap-3 shadow-[0_0_20px_rgba(239,68,68,0.05)]">
-            <div className="mt-1 p-1 bg-red-500 rounded-full shrink-0">
-              <X className="w-3 h-3 text-white" />
+          <div
+            className={cn(
+              'w-full max-w-[90%] md:max-w-[600px] rounded-2xl border p-4 text-left shadow-sm',
+              isPreviewFix
+                ? 'border-amber-500/35 bg-amber-950/20'
+                : 'border-slate-500/30 bg-[var(--bg-card)]'
+            )}
+          >
+            <div className="flex items-center gap-2 mb-2">
+              <RefreshCw
+                className={cn('w-4 h-4 shrink-0', isPreviewFix ? 'text-amber-400' : 'text-slate-400')}
+              />
+              <span
+                className={cn(
+                  'text-xs font-semibold uppercase tracking-wider',
+                  isPreviewFix ? 'text-amber-200/90' : 'text-slate-300'
+                )}
+              >
+                {isPreviewFix ? 'Live preview — fix request' : 'Runner — fix request'}
+              </span>
             </div>
-            <div className="flex-1">
-              <div className="text-red-500 font-bold text-sm mb-1 uppercase tracking-wider">Execution Error</div>
-              <div className="text-red-400/90 text-[15px] leading-relaxed">
-                {errorMatch[1]}
-              </div>
+            <p className="text-sm text-[var(--text-secondary)] mb-2">{headline}</p>
+            <div className="rounded-lg bg-black/30 border border-white/5 p-3 max-h-40 overflow-y-auto custom-scrollbar">
+              <pre className="text-[11px] leading-relaxed text-[var(--text-muted)] whitespace-pre-wrap font-mono">
+                {rest.length > 6000 ? `${rest.slice(0, 6000)}…` : rest}
+              </pre>
             </div>
           </div>
         </motion.div>
       );
     }
+
+    const canvasMatch = displayContent.match(/^\[(Canvas|Search|Think|Reasoning|Project|Deploy|Format|Terminal):\s*(.*)\]$/s);
+    if (canvasMatch) {
+      displayContent = canvasMatch[2];
+    }
   }
 
-  const displayedContent = content;
+  const displayedContent = safeContent;
 
   const handleCopy = async () => {
-    await navigator.clipboard.writeText(content);
+    await navigator.clipboard.writeText(safeContent);
     setIsCopied(true);
     setTimeout(() => setIsCopied(false), 2000);
   };
@@ -352,7 +382,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
   };
 
   // If content is empty and it's the model, show the MorphingSquare loader
-  const showLoader = !isUser && !content && isStreaming;
+  const showLoader = !isUser && !safeContent && isStreaming;
 
   return (
     <motion.div 
@@ -397,7 +427,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
                    >
                      <Search className="w-4 h-4 text-blue-400" />
                    </motion.div>
-                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Searching...</TextShimmer>
+                  <TextShimmer as="span" className="text-sm font-medium" duration={VIBE_THINKING_SHIMMER_DURATION}>
+                    Searching...
+                  </TextShimmer>
                  </>
                ) : isThinking ? (
                  <>
@@ -408,7 +440,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
                    >
                      <BrainCog className="w-4 h-4 text-purple-400" />
                    </motion.div>
-                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Thinking deeply...</TextShimmer>
+                  <TextShimmer as="span" className="text-sm font-medium" duration={VIBE_THINKING_SHIMMER_DURATION}>
+                    Thinking deeply...
+                  </TextShimmer>
                  </>
                ) : isCanvas ? (
                  <>
@@ -419,7 +453,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
                    >
                      <FolderCode className="w-4 h-4 text-orange-400" />
                    </motion.div>
-                   <TextShimmer as="span" className="text-sm font-medium" duration={1.5}>Working on canvas...</TextShimmer>
+                  <TextShimmer as="span" className="text-sm font-medium" duration={VIBE_THINKING_SHIMMER_DURATION}>
+                    Building live preview or running in terminal…
+                  </TextShimmer>
                  </>
                ) : (
                  <>
@@ -446,7 +482,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ role, content, onRegen
           )}
         </AnimatePresence>
         
-        {!isUser && !showLoader && content && (
+        {!isUser && !showLoader && safeContent && (
           <div className="flex items-center gap-2 mt-2 px-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
             {/* Copy Button */}
             <motion.button 

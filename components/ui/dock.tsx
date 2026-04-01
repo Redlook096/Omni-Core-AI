@@ -32,6 +32,7 @@ type DockProps = {
   distance?: number;
   panelHeight?: number;
   magnification?: number;
+  baseItemSize?: number;
   spring?: SpringOptions;
 };
 type DockItemProps = {
@@ -42,10 +43,12 @@ type DockItemProps = {
 type DockLabelProps = {
   className?: string;
   children: React.ReactNode;
+  isHovered?: MotionValue<number>;
 };
 type DockIconProps = {
   className?: string;
   children: React.ReactNode;
+  width?: MotionValue<number>;
 };
 
 type DocContextType = {
@@ -80,6 +83,7 @@ function Dock({
   magnification = DEFAULT_MAGNIFICATION,
   distance = DEFAULT_DISTANCE,
   panelHeight = DEFAULT_PANEL_HEIGHT,
+  baseItemSize = 40,
 }: DockProps) {
   const mouseX = useMotionValue(Infinity);
   const isHovered = useMotionValue(0);
@@ -117,14 +121,21 @@ function Dock({
         aria-label='Application dock'
       >
         <DockProvider value={{ mouseX, spring, distance, magnification }}>
-          {children}
+          {Children.map(children, (child) =>
+            cloneElement(child as React.ReactElement<{ baseItemSize?: number }>, { baseItemSize })
+          )}
         </DockProvider>
       </motion.div>
     </motion.div>
   );
 }
 
-function DockItem({ children, className, onClick }: DockItemProps) {
+function DockItem({
+  children,
+  className,
+  onClick,
+  baseItemSize = 40,
+}: DockItemProps & { baseItemSize?: number }) {
   const ref = useRef<HTMLDivElement>(null);
 
   const { distance, magnification, mouseX, spring } = useDock();
@@ -139,7 +150,7 @@ function DockItem({ children, className, onClick }: DockItemProps) {
   const widthTransform = useTransform(
     mouseDistance,
     [-distance, 0, distance],
-    [40, magnification, 40]
+    [baseItemSize, magnification, baseItemSize]
   );
 
   const width = useSpring(widthTransform, spring);
@@ -162,7 +173,10 @@ function DockItem({ children, className, onClick }: DockItemProps) {
       aria-haspopup='true'
     >
       {Children.map(children, (child) =>
-        cloneElement(child as React.ReactElement, { width, isHovered })
+        cloneElement(
+          child as React.ReactElement<{ width?: MotionValue<number>; isHovered?: MotionValue<number> }>,
+          { width, isHovered }
+        )
       )}
     </motion.div>
   );

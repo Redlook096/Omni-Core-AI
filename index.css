@@ -18,6 +18,23 @@
   --text-user-message: #ffffff;
   --accent-color: #ffffff; /* White in dark mode */
   --bg-dock: rgba(26, 26, 26, 0.6);
+
+  /* Vibe Coder / workspace tokens */
+  --vibe-bg: #0a0a0a;
+  --vibe-bg-deep: #050505;
+  --vibe-bg-raised: #0c0c0c;
+  --vibe-bg-elevated: #111111;
+  --vibe-bg-surface: #0d0d0d;
+  --vibe-border: #1a1a1a;
+  --vibe-border-strong: #2f2f2f;
+  --vibe-text: #ededed;
+  --vibe-text-secondary: #888888;
+  --vibe-text-muted: #5c5c5c;
+  --vibe-text-dim: #525252;
+  --vibe-text-bright: #f0f0f0;
+  --vibe-separator: rgba(255, 255, 255, 0.05);
+  --vibe-separator-strong: rgba(255, 255, 255, 0.08);
+  --vibe-overlay: rgba(0, 0, 0, 0.4);
 }
 
 /* Light Mode Override */
@@ -37,9 +54,25 @@
   --text-user-message: #ffffff;
   --accent-color: #000000; /* Black in light mode */
   --bg-dock: rgba(255, 255, 255, 0.6);
+
+  --vibe-bg: #ffffff;
+  --vibe-bg-deep: #f9fafb;
+  --vibe-bg-raised: #f3f4f6;
+  --vibe-bg-elevated: #e5e7eb;
+  --vibe-bg-surface: #f9fafb;
+  --vibe-border: #e5e7eb;
+  --vibe-border-strong: #d1d5db;
+  --vibe-text: #111827;
+  --vibe-text-secondary: #6b7280;
+  --vibe-text-muted: #9ca3af;
+  --vibe-text-dim: #9ca3af;
+  --vibe-text-bright: #1f2937;
+  --vibe-separator: rgba(0, 0, 0, 0.05);
+  --vibe-separator-strong: rgba(0, 0, 0, 0.08);
+  --vibe-overlay: rgba(255, 255, 255, 0.4);
 }
 
-/* Custom Scrollbar */
+/* Custom Scrollbar — dark grey, low-profile */
 ::-webkit-scrollbar {
   width: 10px;
   height: 10px;
@@ -50,12 +83,12 @@
 }
 
 ::-webkit-scrollbar-thumb {
-  background-color: #525252;
-  border-radius: 5px;
+  background-image: linear-gradient(180deg, #3a3a3a, #525252);
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background-color: #737373;
+  background-image: linear-gradient(180deg, #4b4b4b, #6b6b6b);
 }
 
 .light ::-webkit-scrollbar-thumb {
@@ -74,11 +107,43 @@
   background: transparent;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  background-color: var(--border-color);
-  border-radius: 3px;
+  background-image: linear-gradient(180deg, #3a3a3a, #575757);
+  border-radius: 999px;
 }
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {
-  background-color: var(--text-muted);
+  background-image: linear-gradient(180deg, #4b4b4b, #727272);
+}
+
+/* Agent Network — subtle rotating rim (paired with Framer inner panel) */
+@keyframes agent-network-rim-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.agent-network-rim-glow {
+  animation: agent-network-rim-rotate 4.5s linear infinite;
+  will-change: transform;
+}
+
+/* Agents panel — traveling shimmer along border (iOS-style accent) */
+@keyframes agents-border-shimmer {
+  0% {
+    background-position: 0% 50%;
+  }
+  100% {
+    background-position: 200% 50%;
+  }
+}
+.agents-shimmer-border {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.32) 42%,
+    rgba(255, 255, 255, 0.12) 52%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 200% 100%;
+  animation: agents-border-shimmer 3.2s ease-in-out infinite;
 }
 
 /* Smooth scrolling for the whole page */
@@ -261,4 +326,109 @@ body * {
   padding: 2px 8px !important;
   font-size: 11px !important;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif !important;
+}
+
+/* Vibe Coder — restrained cinematic frame (slow breathing glow) */
+@keyframes vibe-cinematic-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.95;
+  }
+}
+
+.vibe-cinematic-frame {
+  pointer-events: none;
+  animation: vibe-cinematic-pulse 12s ease-in-out infinite;
+  box-shadow:
+    inset 0 0 0 1px rgba(59, 130, 246, 0.22),
+    inset 0 0 100px rgba(59, 130, 246, 0.04),
+    0 0 80px rgba(59, 130, 246, 0.07);
+}
+
+/* ── Light-mode overrides for Vibe Coder & Projects Dashboard ── */
+.light .vibe-cinematic-frame {
+  box-shadow:
+    inset 0 0 0 1px rgba(59, 130, 246, 0.08),
+    inset 0 0 100px rgba(59, 130, 246, 0.02),
+    0 0 80px rgba(59, 130, 246, 0.03);
+}
+
+.light .agents-shimmer-border {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.03) 0%,
+    rgba(0, 0, 0, 0.18) 42%,
+    rgba(0, 0, 0, 0.08) 52%,
+    rgba(0, 0, 0, 0.03) 100%
+  );
+  background-size: 200% 100%;
+}
+
+/*
+ * In light mode, inside .vibe-surface:
+ *   text-white/NN  → text-black/NN   (Tailwind uses --tw-text-opacity on white → 255,255,255)
+ *   border-white/NN → border-black/NN
+ *   bg-white/NN    → bg-black/NN     (subtle overlays)
+ *
+ * We override the Tailwind CSS variable that drives the "white" color channel.
+ */
+.light .vibe-surface {
+  --tw-text-opacity: 1;
+}
+
+/* Override rgba(255,255,255,x) patterns to rgba(0,0,0,x) in light mode */
+.light .vibe-surface [class*="text-white"] {
+  --tw-text-opacity: 1;
+  color: rgb(0 0 0 / var(--tw-text-opacity));
+}
+
+.light .vibe-surface [class*="border-white"] {
+  border-color: rgb(0 0 0 / var(--tw-border-opacity, 0.1));
+}
+
+.light .vibe-surface [class*="bg-white/"] {
+  background-color: rgb(0 0 0 / var(--tw-bg-opacity, 0.05));
+}
+
+/* Preserve actual white backgrounds (not opacity-based) */
+.light .vibe-surface .bg-white:not([class*="bg-white/"]) {
+  background-color: #ffffff;
+}
+
+/* Shadow inversion */
+.light .vibe-surface [class*="shadow-"] {
+  --tw-shadow-color: rgba(0, 0, 0, 0.08);
+}
+
+/* Gradient backgrounds in light mode */
+.light .vibe-surface [class*="blur-[100px]"],
+.light .vibe-surface [class*="blur-[80px]"] {
+  opacity: 0.3;
+}
+
+/* Hover states */
+.light .vibe-surface [class*="hover:bg-white"]:hover {
+  background-color: rgb(0 0 0 / 0.05);
+}
+
+.light .vibe-surface [class*="hover:text-white"]:hover {
+  color: rgb(0 0 0 / 0.9);
+}
+
+/* drop-shadow inversion */
+.light .vibe-surface [class*="drop-shadow"] {
+  filter: drop-shadow(0 0 8px rgba(0, 0, 0, 0.15));
+}
+
+/* selection color */
+.light .vibe-surface ::selection {
+  background-color: rgba(0, 0, 0, 0.12);
+}
+
+/* Noise overlay */
+.light .vibe-surface [class*="mix-blend-overlay"] {
+  opacity: 0.02;
 }
